@@ -15,7 +15,7 @@ def print_status_header():
 
 def print_status_row(didimo):
     # Remove when /status endpoint is consistent with /list
-    if didimo.get('stt') is not None:
+    if didimo.get('stt') == "NOK":
         click.secho("{:<18} │ {:<5} │ {:<7} │ {:^4} │ {:^4} │ {:^4} │ {:<7} │ {:<10} │ {:<19} │ {:<8}"
             .format(didimo['key'], "-", "-", "-", "-",
                     "-", "-", didimo['status'].title(), "-", "-"), fg="red")
