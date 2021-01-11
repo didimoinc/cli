@@ -157,14 +157,14 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
 
     \b
     Examples:
-        Create a 2.0 didimo from a photo
+        Create a didimo from a photo
         $ didimo new photo ~/Downloads/leo.jpg
     \b
-        Create a 2.0 didimo with basic animation and expressions from a photo
-        $ didimo new photo ~/Downloads/leo.jpg -f basic -f expressions
+        Create a didimo with basic animation from a photo
+        $ didimo new photo ~/Downloads/leo.jpg -f basic
     \b
-        Create a 1.6 didimo from a high fidelity scan using the testing-trial configuration
-        $ didimo --config testing-trial new hifimesh_texture_photo ~/Downloads/scan.zip --version 1.6
+        Create a didimo from a high fidelity scan using the testing-trial configuration
+        $ didimo --config testing-trial new hifimesh_texture_photo ~/Downloads/scan.zip
     """
 
     if not feature:
