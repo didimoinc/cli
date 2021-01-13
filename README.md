@@ -1,6 +1,10 @@
 ## Didimo CLI
 
-Didimo CLI is a [command-line interface](https://en.wikipedia.org/wiki/Command-line_interface) to our API.
+ - Website: https://mydidimo.com
+ - Customer Portal: https://app.didimo.co
+ - Documentation: https://docs.didimo.co
+
+Didimo CLI is a command-line interface to our API.
 
 ```
 $ didimo --help
