@@ -23,10 +23,7 @@ def get_didimo_status(config, id):
     return r.json()
 
 def download_didimo(config, id, package_type, output_path):
-    if package_type == "unity":
-        api_path = "/v2/didimo/%s/download/unityzip" % id
-    else:
-        api_path = "/v2/didimo/%s/download/zip" % id
+    api_path = "/v2/didimo/%s/download/%s" % (id, package_type)
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
     s3url = r.json()['location']
