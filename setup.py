@@ -21,7 +21,7 @@ setup(
         'Source': 'https://github.com/didimoinc/cli',
     },
     author="Didimo, Inc.",
-    author_email="support@mydidimo.com",
+    author_email="support@didimo.co",
     keywords='cli, didimo, api',
     license='Apache 2.0',
     classifiers=[

@@ -1,6 +1,6 @@
 ## Didimo CLI
 
- - Website: https://mydidimo.com
+ - Website: https://www.didimo.co
  - Customer Portal: https://app.didimo.co
  - Documentation: https://docs.didimo.co
 
