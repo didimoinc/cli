@@ -4,7 +4,7 @@ import sys
 import time
 
 from .utils import print_key_value, print_status_header, print_status_row
-from .network import DidimoAuth, http_get, http_post
+from .network import DidimoAuth, http_get, http_post, http_post_withphoto
 from .config import Config
 from .helpers import get_didimo_status, download_didimo, URL
 from ._version import __version__
@@ -12,6 +12,8 @@ from ._version import __version__
 pass_api = click.make_pass_decorator(Config)
 
 CONTEXT_SETTINGS = dict(help_option_names=['--help', '-h'])
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("-c", "--config", help="Use this configuration instead of the default one.")
 @click.pass_context
@@ -27,6 +29,7 @@ def cli(ctx, config):
         else:
             ctx.obj.load_configuration(ctx.obj.configuration)
 
+
 @cli.command(short_help="Initializes configuration")
 @click.argument("name", required=True)
 @click.option('--host', type=URL(), prompt=True, help="API host with protocol.", default="https://api.didimo.co", show_default=True)
@@ -41,9 +44,10 @@ def init(config, name, host, api_key, api_secret):
     """
     config.init(name, host, api_key, api_secret)
 
+
 @cli.command()
 @click.option("-n", "--number", required=False, default=1, show_default=True,
-                help="Number of pages to query from the API. Each page has 10 didimos.")
+              help="Number of pages to query from the API. Each page has 10 didimos.")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API, ignoring --number.")
 @pass_api
@@ -57,6 +61,7 @@ def list(config, number, raw):
     if raw:
         click.echo(r.text)
     else:
+
         if number < 1:
             sys.exit(0)
 
@@ -79,8 +84,6 @@ def list(config, number, raw):
             print_status_row(didimo)
 
 
-
-
 @cli.command()
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API.")
@@ -89,55 +92,61 @@ def account(config, raw):
     """
     Get account information
     """
-    api_path = "/v2/profile"
+    api_path = "/v3/accounts/default/status"
     url = config.api_host + api_path
+
     r = http_get(url, auth=DidimoAuth(config, api_path))
     response = r.json()
 
     if raw:
         click.echo(r.text)
     else:
-        api_path2 = "/v2/didimo/list"
+
+        #tier = response["tier"]["name"]
+        #print (response["owner_profile_uuid"])
+        #print (tier)
+
+        api_path2 = "/v3/didimos/"
         url2 = config.api_host + api_path2
+
+        #print (url2)
+
         r2 = http_get(url2, auth=DidimoAuth(config, api_path2))
-        profile = r2.json()
-        print_key_value("Tier", response["tier_label"])
-        print_key_value("Points", response["points"])
-        print_key_value("Available Features", response["available_features"])
-        print_key_value("Total didimos in account", profile['total_list_size'])
+        didimos = r2.json()
+
+        print_key_value("Tier", response["tier"]["name"])
+        print_key_value("Points", response["balance"])
+        print_key_value("Total didimos in account", didimos['total_size'])
         expiry_message = "\n(!) %s points will expire at %s" % \
-                            (response["next_expiration_points"],
-                                response["next_expiration_date"])
+            (response["next_expiration_points"],
+             response["next_expiration_date"])
         click.secho(expiry_message, fg="yellow", err=True)
-
-
 
 
 @cli.command(short_help="Create a didimo")
 @click.argument("type",
-                type=click.Choice(["photo",
-                                    "lofimesh_texture",
-                                    "hifimesh_texture_photo"]),
+                type=click.Choice(["photo"]),
                 required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option('--feature', '-f', multiple=True,
-                type=click.Choice(["basic", "expressions", "visemes", "geometry_objs"]),
-                help="Create didimo with optional features. This flag can be used multiple times.")
+              type=click.Choice(
+                  ["basic", "expressions", "visemes", "geometry_objs"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
-                help="Do not download didimo")
+              help="Do not download didimo")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
-                help="Do not wait for didimo creation and do not download")
+              help="Do not wait for didimo creation and do not download")
 @click.option("--output", "-o", type=click.Path(), required=False,
-                help="Path to download the didimo. If multiple package types "
-                    "are present or if the flags --no-wait or --no-download "
-                    "are present, this option is ignored. [default: <ID>.zip]")
+              help="Path to download the didimo. If multiple package types "
+              "are present or if the flags --no-wait or --no-download "
+              "are present, this option is ignored. [default: <ID>.zip]")
 @click.option('--package-type', '-p', multiple=True,
-                type=click.Choice(["maya", "unity", "webviewer"]), default=["maya"],
-                help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+              type=click.Choice(["fbx", "gltf"]), default=["fbx"],
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
 @click.option("--version", "-v",
-                type=click.Choice(["1.6", "2.0"]),
-                default="2.0",
-                help="Version of the didimo.", show_default=True)
+              type=click.Choice(["1.6", "2.0"]),
+              default="2.0",
+              help="Version of the didimo.", show_default=True)
 @pass_api
 def new(config, type, input, feature, no_download, no_wait, output, package_type, version):
     """
@@ -159,22 +168,26 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     Examples:
         Create a didimo from a photo
         $ didimo new photo ~/Downloads/leo.jpg
-    \b
-        Create a didimo with basic animation from a photo
-        $ didimo new photo ~/Downloads/leo.jpg -f basic
-    \b
-        Create a didimo from a high fidelity scan using the testing-trial configuration
-        $ didimo --config testing-trial new hifimesh_texture_photo ~/Downloads/scan.zip
+
     """
 
-    if not feature:
-        api_path = "/v2/didimo/new/%s/%s/%s" % (type, ','.join(package_type), version)
-    else:
-        api_path = "/v2/didimo/new/%s/%s/%s/%s" % (type, ','.join(package_type), version, ','.join(feature))
+    api_path = "/v3/didimos"
     url = config.api_host + api_path
-    files = {'file': click.open_file(input, 'rb')}
-    r = http_post(url, auth=DidimoAuth(config, api_path), files=files)
+
+    payload = {
+        'input_type': 'photo',
+        'transfer_formats': ['gltf', 'fbx'],
+        'max_texture_dimension': '1024',
+        'oculus_lipsync': 'true',
+        'simple_poses': 'true',
+        'arkit': 'true',
+        'aws_polly': 'true'
+    }
+
+    r = http_post_withphoto(url, config.access_key, payload, input)
+
     didimo_id = r.json()['key']
+
     click.echo(didimo_id)
     if not no_wait:
         with click.progressbar(length=100, label='Creating didimo') as bar:
@@ -185,9 +198,10 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
                 update = percent - last_value
                 last_value = percent
                 bar.update(update)
-                if response['stt'] == "NOK":
+                if response['status_message'] != "":
                     click.secho(err=True)
-                    click.secho('Error: %s' % response["msg"], err=True, fg='red')
+                    click.secho('Error: %s' %
+                                response["status_message"], err=True, fg='red')
                     sys.exit(1)
                 if response['status'] == 'done':
                     break
@@ -197,8 +211,6 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
                 if output == None:
                     output = "%s.zip" % didimo_id
                 download_didimo(config, didimo_id, package_type[0], output)
-
-
 
 
 @cli.command(short_help='Get status of didimos')
@@ -234,11 +246,12 @@ def status(config, id, raw, silent):
         ids = sys.stdin.readlines()
 
     for didimo in ids:
+
         response = get_didimo_status(config, didimo.rstrip())
 
         # TODO
         # Remove this block when /status endpoint is consistent with /list
-        if response["stt"] == "NOK":
+        if response['status_message'] != "":
             response["key"] = didimo.rstrip()
             response["status"] = "error"
 
@@ -253,15 +266,12 @@ def status(config, id, raw, silent):
     if silent:
         sys.exit(0)
 
-
     if raw:
         click.echo(json.dumps(didimos, indent=4))
     else:
         print_status_header()
         for didimo in didimos:
             print_status_row(didimo)
-
-
 
 
 @cli.command(short_help="Get or set configuration")
@@ -283,15 +293,13 @@ def config(config, name):
         click.secho("Configuration file saved.", fg='blue', err=True)
 
 
-
-
 @cli.command()
 @click.argument("id", required=True)
 @click.option("-o", "--output", type=click.Path(),
-                help="Download path. [default: <ID>.zip]")
+              help="Download path. [default: <ID>.zip]")
 @click.option('--package-type', '-p',
-                type=click.Choice(["maya", "unity", "webviewer"]), default="maya",
-                help="Specify output type for this didimo.", show_default=True)
+              type=click.Choice(["maya", "unity", "webviewer"]), default="maya",
+              help="Specify output type for this didimo.", show_default=True)
 @pass_api
 def download(config, id, output, package_type):
     """
@@ -310,6 +318,7 @@ def download(config, id, output, package_type):
         output = "%s.zip" % id
     download_didimo(config, id, package_type, output)
 
+
 @cli.command()
 @pass_api
 def version(config):
@@ -320,8 +329,6 @@ def version(config):
     sys.exit(0)
 
 
-
-
 @cli.group()
 @pass_api
 def execute(config):
@@ -329,8 +336,6 @@ def execute(config):
     Execute on-demand features on didimos
     """
     pass
-
-
 
 
 @execute.command(short_help="Produce high fidelity blendshapes on a didimo")
@@ -358,8 +363,6 @@ def blendshapes(config, id, raw):
         click.echo(json.dumps(response, indent=4))
     else:
         click.echo(response['key'])
-
-
 
 
 @execute.command(short_help="Deform a model to match a didimo shape")

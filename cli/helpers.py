@@ -4,6 +4,7 @@ import sys
 from .network import DidimoAuth, http_get
 from urllib import parse as urlparse
 
+
 class URL(click.ParamType):
     name = "url"
 
@@ -16,18 +17,26 @@ class URL(click.ParamType):
                 self.fail("host is empty", param, ctx)
         return value
 
+
 def get_didimo_status(config, id):
-    api_path = "/v2/didimo/%s/status" % id
+    api_path = "/v3/didimos/" + id
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
     return r.json()
 
+
 def download_didimo(config, id, package_type, output_path):
-    api_path = "/v2/didimo/%s/download/%s" % (id, package_type)
+
+    api_path = "/v3/didimos/" + id
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
-    s3url = r.json()['location']
-    with http_get(s3url, stream=True) as r:
+
+    if package_type == r.json()['transfer_formats'][0]["name"]:
+        s3url = r.json()['transfer_formats'][0]["__links"]["self"]
+    else:
+        s3url = r.json()['transfer_formats'][1]["__links"]["self"]
+
+    with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
         r.raise_for_status()
         zipsize = int(r.headers.get('content-length', 0))
         with click.open_file(output_path, 'wb') as f:
