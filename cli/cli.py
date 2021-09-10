@@ -55,7 +55,7 @@ def list(config, number, raw):
     """
     List didimos
     """
-    api_path = "/v2/didimo/list"
+    api_path = "/v3/didimos/"
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
     if raw:
@@ -67,14 +67,15 @@ def list(config, number, raw):
 
         didimos = []
         page = 1
-        didimos += r.json()['models']
+        didimos += r.json()['didimos']
+
         while page != number:
-            next_page = r.json().get('next', None)
+            next_page = r.json()['__links']['next']
             if next_page != None:
-                api_path = "/v2" + next_page
+                api_path = next_page
                 url = config.api_host + api_path
                 r = http_get(url, auth=DidimoAuth(config, api_path))
-                didimos += r.json()['models']
+                didimos += r.json()['didimos']
                 page += 1
             else:
                 break
