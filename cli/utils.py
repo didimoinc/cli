@@ -19,9 +19,9 @@ def print_status_row(didimo):
 
     # Remove when /status endpoint is consistent with /list
     if didimo.get('status') == "error":
-        click.secho("{:<18} │ {:<5} │ {:<7} │ {:^4} │ {:^4} │ {:^4} │ {:<7} │ {:<10} │ {:<19} │ {:<8}"
-                    .format(didimo['key'], "-", "-", "-", "-",
-                            "-", "-", didimo['status'].title(), "-", "-"), fg="red")
+        click.secho("{:<18} │ {:<5} │ {:<7} │ {:<6} │ {:^4}  "
+                    .format(didimo['key'], "-", "-",
+                             didimo['status'].title(), "-"), fg="red")
         return
 
     color = 'white'

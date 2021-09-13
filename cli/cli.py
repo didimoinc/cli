@@ -70,10 +70,11 @@ def list(config, number, raw):
         didimos += r.json()['didimos']
 
         while page != number:
+
             next_page = r.json()['__links']['next']
             if next_page != None:
                 api_path = next_page
-                url = config.api_host + api_path
+                url = api_path
                 r = http_get(url, auth=DidimoAuth(config, api_path))
                 didimos += r.json()['didimos']
                 page += 1
@@ -156,9 +157,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     TYPE is the type of input used to create the didimo. Accepted values are:
 
     \b
-        - photo (input must be a .jpg/.jpeg)
-        - lofimesh_texture (input must be a .zip)
-        - hifimesh_texture_photo (input must be a .zip)
+        - photo (input must be a .jpg/.jpeg)        
 
         For more information on the input types, visit
         https://docs.didimo.co/api/?javascript#new\b
