@@ -126,14 +126,19 @@ def account(config, raw):
 
 
 @cli.command(short_help="Create a didimo")
-@click.argument("type",
-                type=click.Choice(["photo"]),
-                required=True, metavar="TYPE")
+@click.argument("type", type=click.Choice(["photo"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
+@click.option('--depth', '-d',
+              type=click.Path(), required=False,
+              help="Create didimo with depth")
 @click.option('--feature', '-f', multiple=True,
               type=click.Choice(
-                  ["basic", "expressions", "visemes", "geometry_objs"]),
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max_texture_dimension. ")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -143,14 +148,14 @@ def account(config, raw):
               "are present or if the flags --no-wait or --no-download "
               "are present, this option is ignored. [default: <ID>.zip]")
 @click.option('--package-type', '-p', multiple=True,
-              type=click.Choice(["fbx", "gltf"]), default=["fbx"],
+              type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
 @click.option("--version", "-v",
-              type=click.Choice(["1.6", "2.0"]),
+              type=click.Choice(["2.0"]),
               default="2.0",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new(config, type, input, feature, no_download, no_wait, output, package_type, version):
+def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version):
     """
     Create a didimo
 
@@ -158,6 +163,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
 
     \b
         - photo (input must be a .jpg/.jpeg)        
+        - depth (input must be a .png)       
 
         For more information on the input types, visit
         https://docs.didimo.co/api/?javascript#new\b
@@ -175,16 +181,22 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     url = config.api_host + api_path
 
     payload = {
-        'input_type': 'photo',
-        'transfer_formats': ['gltf', 'fbx'],
-        'max_texture_dimension': '1024',
-        'oculus_lipsync': 'true',
-        'simple_poses': 'true',
-        'arkit': 'true',
-        'aws_polly': 'true'
+        'input_type': 'photo'
     }
 
-    r = http_post_withphoto(url, config.access_key, payload, input)
+    if depth != None:
+        payload["input_type"] = "rgbd"
+    else:
+        payload["input_type"] = "photo"
+
+    if len(package_type) > 0:
+        print ("here")
+        payload["transfer_formats"] = package_type
+
+    if max_texture != None:
+        payload["max_texture_dimension"] = max_texture
+
+    r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
     didimo_id = r.json()['key']
 

@@ -53,9 +53,15 @@ def http_post(url, **kwargs):
         sys.exit(1)
 
 
-def http_post_withphoto(url, access_key, payload, photo):
+def http_post_withphoto(url, access_key, payload, photo, photo_depth):
 
-    files = [('photo', (photo, open(photo, 'rb'), 'image/jpeg'))]
+    if photo_depth != None:
+        files = [
+            ('photo', (photo, open(photo, 'rb'), 'image/jpeg')),
+            ('depth', (photo_depth, open(photo_depth, 'rb'), 'image/png'))
+        ]
+    else:
+        files = [('photo', (photo, open(photo, 'rb'), 'image/jpeg'))]
 
     headers = {
         'DIDIMO-API-KEY': access_key
