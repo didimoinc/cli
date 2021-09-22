@@ -30,14 +30,17 @@ def download_didimo(config, id, package_type, output_path):
     api_path = "/v3/didimos/" + id
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
-
-    for package_itm in r.json()['transfer_formats']:        
-        if package_type== None:            
+    s3url=""
+        
+    
+    for package_itm in r.json()['transfer_formats']:   
+        
+        if package_type== None or len(package_type)==0:            
             s3url = package_itm["__links"]["self"]
         else:
             if package_itm["name"] == package_type:
                 s3url = package_itm["__links"]["self"]
-        
+       
         if s3url !="":
             print ("downloading....")
             with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
@@ -53,6 +56,6 @@ def download_didimo(config, id, package_type, output_path):
         
         else:
             print ("Unable to download")
-
+ 
        
         

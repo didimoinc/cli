@@ -189,13 +189,15 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     else:
         payload["input_type"] = "photo"
 
-    if len(package_type) > 0:
-        print ("here")
+    if len(package_type) > 0:        
         payload["transfer_formats"] = package_type
 
     if max_texture != None:
         payload["max_texture_dimension"] = max_texture
 
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+ 
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
     didimo_id = r.json()['key']
@@ -217,13 +219,12 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
                     sys.exit(1)
                 if response['status'] == 'done':
                     break
-                time.sleep(2)
-        if len(package_type) == 1:
-            if not no_download:
-                if output == None:
-                    output = "%s.zip" % didimo_id
-                download_didimo(config, didimo_id, package_type[0], output)
-
+                time.sleep(2)        
+        if not no_download:
+            if output == None:
+                output = "%s.zip" % didimo_id
+            download_didimo(config, didimo_id, "", output)
+  
 
 @cli.command(short_help='Get status of didimos')
 @click.argument("id", required=True, nargs=-1)
