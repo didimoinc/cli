@@ -138,7 +138,7 @@ def account(config, raw):
 @click.option('--max-texture', '-m', multiple=False,
               type=click.Choice(
                   ["512", "1024", "2048"]),
-              help="Create didimo with optional max_texture_dimension. ")
+              help="Create didimo with optional max texture dimension. ")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -310,7 +310,7 @@ def config(config, name):
 @click.option("-o", "--output", type=click.Path(),
               help="Download path. [default: <ID>.zip]")
 @click.option('--package-type', '-p',
-              type=click.Choice(["maya", "unity", "webviewer"]), default="maya",
+              type=click.Choice(["fbx", "gltf"]),
               help="Specify output type for this didimo.", show_default=True)
 @pass_api
 def download(config, id, output, package_type):
@@ -330,7 +330,7 @@ def download(config, id, output, package_type):
         output = "%s.zip" % id
     download_didimo(config, id, package_type, output)
 
-
+ 
 @cli.command()
 @pass_api
 def version(config):
