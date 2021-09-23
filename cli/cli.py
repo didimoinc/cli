@@ -151,8 +151,8 @@ def account(config, raw):
               type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
 @click.option("--version", "-v",
-              type=click.Choice(["2.0"]),
-              default="2.0",
+              type=click.Choice(["2.5"]),
+              default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
 def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version):
