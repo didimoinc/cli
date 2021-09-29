@@ -357,11 +357,11 @@ def execute(config):
 @pass_api
 def hairsdeform(config, input):
     """
-    Produce high fidelity blendshapes on a didimo
+    Produce high fidelity hairsdeform on a didimo
 
     <INPUT> is your deformation file.
 
-    Returns the blendshapes didimo asset ID that you can use with other commands.
+    Returns the didimo asset ID that you can use with other commands and hairsdeform package.
     """
 
     api_path = "/v3/assets"
@@ -413,7 +413,7 @@ def vertexdeform(config, vertex, user_asset):
     <VERTEX> is your vertex file.
     <USER_ASSET> is your asset file.
 
-    Returns an asset ID of the deformed vertex that you can use with other commands.
+    Returns an asset ID of the deformed vertex that you can use with other commands and the package.
     """
 
     api_path = "/v3/assets"
