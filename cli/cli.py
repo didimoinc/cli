@@ -2,11 +2,12 @@ import click
 import json
 import sys
 import time
+import requests
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto
 from .config import Config
-from .helpers import get_didimo_status, download_didimo, URL
+from .helpers import get_didimo_status, download_didimo, URL, download_asset
 from ._version import __version__
 
 pass_api = click.make_pass_decorator(Config)
@@ -189,7 +190,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     else:
         payload["input_type"] = "photo"
 
-    if len(package_type) > 0:        
+    if len(package_type) > 0:
         payload["transfer_formats"] = package_type
 
     if max_texture != None:
@@ -197,7 +198,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
 
     for feature_item in feature:
         payload[feature_item] = 'true'
- 
+
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
     didimo_id = r.json()['key']
@@ -219,12 +220,12 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
                     sys.exit(1)
                 if response['status'] == 'done':
                     break
-                time.sleep(2)        
+                time.sleep(2)
         if not no_download:
             if output == None:
                 output = "%s.zip" % didimo_id
             download_didimo(config, didimo_id, "", output)
-  
+
 
 @cli.command(short_help='Get status of didimos')
 @click.argument("id", required=True, nargs=-1)
@@ -331,7 +332,7 @@ def download(config, id, output, package_type):
         output = "%s.zip" % id
     download_didimo(config, id, package_type, output)
 
- 
+
 @cli.command()
 @pass_api
 def version(config):
@@ -351,59 +352,104 @@ def execute(config):
     pass
 
 
-@execute.command(short_help="Produce high fidelity blendshapes on a didimo")
-@click.argument("id", required=True)
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+@execute.command(short_help="Produce high fidelity hairs on a didimo")
+@click.argument("input", type=click.Path(exists=True), required=True)
 @pass_api
-def blendshapes(config, id, raw):
+def hairsdeform(config, input):
     """
     Produce high fidelity blendshapes on a didimo
 
-    <ID> is the target didimo ID. When given the "-" character, read the didimo
-    ID from STDIN.
+    <INPUT> is your deformation file.
 
-    Returns the blendshapes didimo ID that you can use with other commands.
+    Returns the blendshapes didimo asset ID that you can use with other commands.
     """
-    if id == "-":
-        id = sys.stdin.readlines()[0].rstrip()
 
-    api_path = "/v2/didimo/%s/execute/blendshapes" % id
+    api_path = "/v3/assets"
     url = config.api_host + api_path
-    r = http_get(url, auth=DidimoAuth(config, api_path))
+
+    payload = {
+        'input_type': 'hairs_deform'
+    }
+
+    files = [('template_deformation', (input, open(
+        input, 'rb'), 'application/octet-stream'))]
+
+    headers = {
+        'DIDIMO-API-KEY': config.access_key
+    }
+
+    r = requests.request("POST", url, headers=headers,
+                         data=payload, files=files)
+
+    if r.status_code != 201:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        sys.exit(1)
+
     response = r.json()
-    if raw:
-        click.echo(json.dumps(response, indent=4))
-    else:
-        click.echo(response['key'])
+
+    key = response['key']
+    url = ""
+    for package_itm in r.json()['transfer_formats']:
+        url = package_itm["__links"]["self"]
+        break
+
+    click.echo(response['key'])
+    output = "%s.zip" % key
+
+    click.echo("Creating package file.")
+    time.sleep(15)
+    download_asset(config, url, api_path, output)
 
 
 @execute.command(short_help="Deform a model to match a didimo shape")
-@click.argument("id", required=True)
 @click.argument("vertex", required=True, type=click.Path(exists=True))
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+@click.argument("user_asset", required=True, type=click.Path(exists=True))
 @pass_api
-def vertexdeform(config, id, vertex, raw):
+def vertexdeform(config, vertex, user_asset):
     """
     Deform a model to match a didimo shape
 
-    <ID> is the target didimo ID. When given the "-" character, read the didimo
-    ID from STDIN.
-
     <VERTEX> is your vertex file.
+    <USER_ASSET> is your asset file.
 
-    Returns an ID of the deformed vertex that you can use with other commands.
+    Returns an asset ID of the deformed vertex that you can use with other commands.
     """
-    if id == "-":
-        id = sys.stdin.readlines()[0].rstrip()
 
-    api_path = "/v2/didimo/%s/execute/vertexdeform" % id
+    api_path = "/v3/assets"
     url = config.api_host + api_path
-    with click.open_file(vertex, 'rb') as v:
-        r = http_post(url, auth=DidimoAuth(config, api_path), data=v)
-        response = r.json()
-        if raw:
-            click.echo(json.dumps(response, indent=4))
-        else:
-            click.echo(response['key'])
+
+    payload = {'input_type': 'vertex_deform'}
+
+    files = [
+        ('template_deformation', (vertex, open(
+            vertex, 'rb'), 'application/octet-stream')),
+        ('user_asset', (user_asset, open(user_asset, 'rb'), 'application/octet-stream'))
+    ]
+
+    headers = {
+        'DIDIMO-API-KEY': config.access_key
+    }
+
+    r = requests.request("POST", url, headers=headers,
+                         data=payload, files=files)
+
+    if r.status_code != 201:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        sys.exit(1)
+
+    response = r.json()
+
+    key = response['key']
+    url = ""
+    for package_itm in r.json()['transfer_formats']:
+        url = package_itm["__links"]["self"]
+        break
+
+    click.echo(response['key'])
+    output = "%s.zip" % key
+
+    click.echo("Creating package file.")
+    time.sleep(15)
+    download_asset(config, url, api_path, output)

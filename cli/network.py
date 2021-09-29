@@ -15,17 +15,8 @@ class DidimoAuth(requests.auth.AuthBase):
         self.path = path
 
     def __call__(self, r):
-        #uri = self.path
         access_key = self.config.access_key
-        #secret_key = self.config.secret_key
-        #ts = time.time()
-        #nonce = "%fcliclicli" % ts
-        #ha1 = sha256(access_key.encode() + secret_key.encode()).hexdigest()
-        #ha2 = sha256(access_key.encode() + nonce.encode() + uri.encode()).hexdigest()
-        #digest = hmac.new(secret_key.encode(), (ha1 + ha2).encode(), 'sha256').hexdigest()
-
         r.headers["didimo-api-key"] = access_key
-
         r.headers["User-Agent"] = "didimo-cli/%s (%s, %s)" % (__version__,
                                                               platform.python_version(),
                                                               platform.system())
