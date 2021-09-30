@@ -48,6 +48,13 @@ and can be installed with pip.
 pip3 install didimo-cli
 ```
 
+If you already have a previous version installed, you should execute:
+
+```bash
+pip3 install didimo-cli --upgrade
+```
+
+
 ##### 2. Configure with your API Key
 
 Create a new configuration and input your API Key. If you do not have an API Key,
