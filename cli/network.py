@@ -25,12 +25,16 @@ class DidimoAuth(requests.auth.AuthBase):
 
 
 def http_get(url, **kwargs):
-    r = requests.get(url, **kwargs)
-    if r.status_code == 200:
-        return r
-    else:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo(r.text)
+    try:
+        r = requests.get(url, **kwargs)
+        if r.status_code == 200:
+            return r
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo(r.text)
+            sys.exit(1)
+    except:
+        click.echo("A Network Error Has Occured")
         sys.exit(1)
 
 
