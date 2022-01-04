@@ -17,15 +17,16 @@ Options:
   -h, --help         Show this message and exit.
 
 Commands:
-  account   Get account information
-  config    Get or set configuration
-  download  Download a didimo
-  execute   Execute on-demand features on didimos
-  init      Initializes configuration
-  list      List didimos
-  new       Create a didimo
-  status    Get status of didimos
-  version   Print version and exit
+  account       Get account information
+  config        Get or set configuration
+  download      Download a didimo
+  execute       Execute on-demand features on didimos
+  init          Initializes configuration
+  list          List didimos
+  vertexdeform  Deform a model
+  new           Create a didimo
+  status        Get status of didimos
+  version       Print version and exit
 ```
 
 These are the features that are implemented at the moment:
