@@ -163,7 +163,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     TYPE is the type of input used to create the didimo. Accepted values are:
 
     \b
-        - photo (input must be a .jpg/.jpeg)        
+        - photo (input must be a .jpg/.jpeg/.png)        
         - depth (input must be a .png)       
 
         For more information on the input types, visit
@@ -174,7 +174,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     \b
     Examples:
         Create a didimo from a photo
-        $ didimo new photo ~/Downloads/leo.jpg
+        $ didimo new photo /path/input.jpg
 
     """
 
