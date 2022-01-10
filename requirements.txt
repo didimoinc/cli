@@ -4,5 +4,5 @@ click==7.1.2
 # Editable install with no version control (didimo-cli==1.0)
 -e .
 idna==2.10
-requests==2.24.0
-urllib3==1.25.9
+requests==2.27.1
+urllib3==1.26.5
