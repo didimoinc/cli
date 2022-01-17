@@ -163,7 +163,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     TYPE is the type of input used to create the didimo. Accepted values are:
 
     \b
-        - photo (input must be a .jpg/.jpeg)        
+        - photo (input must be a .jpg/.jpeg/.png)        
         - depth (input must be a .png)       
 
         For more information on the input types, visit
@@ -174,7 +174,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
     \b
     Examples:
         Create a didimo from a photo
-        $ didimo new photo ~/Downloads/leo.jpg
+        $ didimo new photo /path/input.jpg
 
     """
 
@@ -192,6 +192,8 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
+    else:
+        package_type = "gltf"
 
     if max_texture != None:
         payload["max_texture_dimension"] = max_texture
@@ -201,8 +203,8 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
 
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
-    didimo_id = r.json()['key']
-
+    didimo_id = r.json()['key']    
+    
     click.echo(didimo_id)
     if not no_wait:
         with click.progressbar(length=100, label='Creating didimo') as bar:
@@ -223,7 +225,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
                 time.sleep(2)
         if not no_download:
             if output == None:
-                output = "%s.zip" % didimo_id
+                output = "%s_%s.zip" % (didimo_id, package_type)                
             download_didimo(config, didimo_id, "", output)
 
 
