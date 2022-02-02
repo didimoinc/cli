@@ -167,7 +167,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
         - depth (input must be a .png)
 
         For more information on the input types, visit
-        https://docs.didimo.co/api/?javascript#new\b
+        https://developer.didimo.co/docs/cli\b
 
     INPUT is the path to the input file.
 
