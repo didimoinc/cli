@@ -33,9 +33,9 @@ def download_didimo(config, id, package_type, output_path):
 
     for package_itm in r.json()['transfer_formats']:
 
+        output_path = id+"_"+package_itm["name"] + ".zip"
+
         if package_type == None or len(package_type) == 0:
-            output_path=id+"_"+package_itm["name"] +".zip"
-            print(output_path)
             s3url = package_itm["__links"]["self"]
         else:
             if package_itm["name"] == package_type:
