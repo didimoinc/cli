@@ -69,5 +69,5 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth):
         return r
     else:
         click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo(r.text)
+        click.echo("An error has occured. Please check your API key")
         sys.exit(1)
