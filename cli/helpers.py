@@ -29,10 +29,10 @@ def download_didimo(config, id, package_type, output_path):
     api_path = "/v3/didimos/" + id
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
-    s3url = ""
+
 
     for package_itm in r.json()['transfer_formats']:
-
+        s3url = ""
         output_path = id+"_"+package_itm["name"] + ".zip"
 
         if package_type == None or len(package_type) == 0:
@@ -54,8 +54,8 @@ def download_didimo(config, id, package_type, output_path):
                             bar.update(size)
             click.secho('Downloaded to %s' % output_path, fg='blue', err=True)
 
-        else:
-            print ("Unable to download")
+        # else:
+            # print ("Unable to download")
 
 
 def download_asset(config, asset_url, api_path, output_path):
