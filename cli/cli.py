@@ -127,7 +127,7 @@ def account(config, raw):
 
 
 @cli.command(short_help="Create a didimo")
-@click.argument("type", type=click.Choice(["photo"]), required=True, metavar="TYPE")
+@click.argument("input_type", type=click.Choice(["photo", "photo_body"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
@@ -136,6 +136,18 @@ def account(config, raw):
               type=click.Choice(
                   ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "half-body", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["001", "002", "003"]),
+              help="Create didimo with garment option.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "none"]),
+              help="Create didimo with gender option.")
 @click.option('--max-texture', '-m', multiple=False,
               type=click.Choice(
                   ["512", "1024", "2048"]),
@@ -156,7 +168,7 @@ def account(config, raw):
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version):
+def new(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, version):
     """
     Create a didimo
 
@@ -164,6 +176,7 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
 
     \b
         - photo (input must be a .jpg/.jpeg/.png)
+        - photo_body (input must be a .jpg/.jpeg/.png)
         - depth (input must be a .png)
 
         For more information on the input types, visit
@@ -178,17 +191,28 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
 
     """
 
-    api_path = "/v3/didimos"
+    api_path = "/v3/didimos-new"
     url = config.api_host + api_path
 
     payload = {
-        'input_type': 'photo'
+#        'input_type': 'photo'
     }
 
-    if depth != None:
-        payload["input_type"] = "rgbd"
-    else:
-        payload["input_type"] = "photo"
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if avatar_structure != None:
+        payload["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        payload["garment"] = garment
+
+    if gender != None:
+        if gender == "none":
+            payload["gender"] = ""
+        else:
+            payload["gender"] = gender
+
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
