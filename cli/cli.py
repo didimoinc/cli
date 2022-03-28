@@ -126,20 +126,116 @@ def account(config, raw):
         click.secho(expiry_message, fg="yellow", err=True)
 
 
+
+def list_features_aux(config):
+    """
+    Get account features based on the pricing model
+    """
+    api_path = "/v3/accounts/default/status"
+    url = config.api_host + api_path
+
+    r = http_get(url, auth=DidimoAuth(config, api_path))
+    response = r.json()
+
+    output = {} #[]
+    #click.echo(r.text)
+    if "request_configuration_settings" in response:
+        requestConfigSettings = response["request_configuration_settings"]
+        #click.echo(requestConfigSettings)
+        if requestConfigSettings:
+            requestConfigObjects = requestConfigSettings["objects"]
+            #click.echo(requestConfigObjects)
+            #click.echo("")
+            if requestConfigObjects:
+                for requestConfigObject in requestConfigObjects:
+                    feature_name = requestConfigObject["code"]
+                    feature_group = requestConfigObject["group"]
+                    #click.echo("Feature: "+requestConfigObject["code"])
+                    requestConfigOptions = requestConfigObject["options"]
+                    output[feature_name] = { "group": feature_group, "options":[]}
+                    is_boolean = False
+
+                    if requestConfigOptions:
+                        for requestConfigOption in requestConfigOptions:
+                            if "type" in requestConfigOption and requestConfigOption["type"] == "boolean":
+                                is_boolean = True
+                                break
+                            #click.echo(requestConfigOption)
+                            #click.echo(requestConfigOption["label"])
+                            if "label" in requestConfigOption:
+                                output[feature_name]["options"].append(requestConfigOption["label"])
+
+                    if is_boolean:
+                        output[feature_name]["options"] = "boolean" 
+                    else:
+                        #list is not working properly so let's remove duplicates manually
+                        distinct_list = []
+                        for item in output[feature_name]["options"]:
+                            try:
+                                #search for the item
+                                index = distinct_list.index(item)
+                            except ValueError:
+                                #print('item not present')
+                                distinct_list.append(item)
+                        output[feature_name]["options"] = distinct_list #to remove duplicates
+                    #click.echo("----")
+                #click.echo(output)
+    return output
+
+
+@cli.command(short_help="List available features for creating a didimo")
+@pass_api
+def list_features(config):
+    """
+    List available features for creating a didimo
+
+    Use the `new` command to use these accepted values.
+
+    """
+
+    accepted_input_types = []
+    accepted_targets = []
+    featureList = list_features_aux(config)
+
+    click.echo("Accepted features are:")
+    for item in featureList:
+        if "group" in featureList[item]:
+            if (str(featureList[item]["group"])) == "recipe":
+                accepted_input_types.append(item)
+            elif str(featureList[item]["group"]) == "targets":
+                accepted_targets.append(featureList[item]["options"])
+            else:
+                click.echo(" - "+item+" => "+str(featureList[item]["options"]))
+
+    click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
+    for item in accepted_input_types:
+        click.echo(" - "+item)
+
+    click.echo("Package type is the type of output of the didimo. Accepted target values are:")
+    for item in accepted_targets:
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
+
+
 @cli.command(short_help="Create a didimo")
-@click.argument("type", type=click.Choice(["photo"]), required=True, metavar="TYPE")
+@click.argument("type", 
+            #type=click.Choice(["photo"]), 
+            required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
-@click.option('--depth', '-d',
-              type=click.Path(), required=False,
-              help="Create didimo with depth")
+#@click.option('--depth', '-d',
+#              type=click.Path(), required=False,
+#              help="Create didimo with depth")
 @click.option('--feature', '-f', multiple=True,
-              type=click.Choice(
-                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              #type=click.Choice(
+              #    ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
-@click.option('--max-texture', '-m', multiple=False,
-              type=click.Choice(
-                  ["512", "1024", "2048"]),
-              help="Create didimo with optional max texture dimension. ")
+#@click.option('--max-texture', '-m', multiple=False,
+#              type=click.Choice(
+#                  ["512", "1024", "2048"]),
+#              help="Create didimo with optional max texture dimension. ")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -149,18 +245,23 @@ def account(config, raw):
               "are present or if the flags --no-wait or --no-download "
               "are present, this option is ignored. [default: <ID>.zip]")
 @click.option('--package-type', '-p', multiple=True,
-              type=click.Choice(["fbx", "gltf"]),
+#              type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option("--list-features", "-l",
+              is_flag=True,
+              help="List the available features that can be requested.", show_default=True)
 @click.option("--version", "-v",
               type=click.Choice(["2.5"]),
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version):
+def new(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version):
     """
     Create a didimo
 
-    TYPE is the type of input used to create the didimo. Accepted values are:
+    TYPE is the type of input used to create the didimo. Use `didimo list-features` to see the accepted values.
+
+    INPUT is the path to the input file.
 
     \b
         - photo (input must be a .jpg/.jpeg/.png)
@@ -169,39 +270,116 @@ def new(config, type, input, depth, feature, max_texture, no_download, no_wait, 
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
 
-    INPUT is the path to the input file.
-
     \b
     Examples:
-        Create a didimo from a photo
-        $ didimo new photo /path/input.jpg
+
+        List available features, accepted input types, and output formats \b
+
+            $ didimo list-features
+
+        Create a didimo from a photo without any extra features\b
+
+            $ didimo new photo /path/input.jpg
+
+        Create a didimo with arkit feature from a photo \b
+
+            $ didimo new photo -f arkit /path/input.jpg
+
+        Create a didimo with max_texture_dimension feature from a photo \b
+
+            $ didimo new photo -f max_texture_dimension=2048 /path/input.jpg
 
     """
+
+    click.echo("")
+    click.echo("Obtaining params list...")
+    feature_param = []
+    feature_param_value = []
+    invalid_param_request = []
+    accepted_input_types = []
+    accepted_targets = []
+
+    if feature :
+        for param in feature:
+            param_array = param.split("=", param.count(param))
+            feature_param.append(param_array[0])
+            if len(param_array) == 1:
+                feature_param_value.append("true")
+            else:
+                feature_param_value.append(param_array[1])
+        #click.echo("feature_param: "+str(feature_param))
+        #click.echo("feature_param_value: "+str(feature_param_value))
+
+        click.echo("Obtaining feature list...")
+        featureList = list_features_aux(config)
+
+        click.echo("Obtaining input types...")
+        for item in featureList:
+            if "group" in featureList[item]:
+                if (str(featureList[item]["group"])) == "recipe":
+                    accepted_input_types.append(item)
+                elif str(featureList[item]["group"]) == "targets":
+                    if len(featureList[item]["options"]) > 0:
+                        for sub_item in featureList[item]["options"]:
+                            accepted_targets.append(sub_item)
+                    else:
+                        accepted_targets.append(featureList[item]["options"])
+        #click.echo(accepted_input_types)
+        #click.echo(accepted_targets)
+
+        click.echo("Crosschecking requested features...")
+
+        for name in feature_param:
+            if name not in featureList:
+                invalid_param_request.append(name)
+
+        try:
+            index = accepted_input_types.index(type)
+        except ValueError:
+            invalid_param_request.append(type)
+            click.echo("Error - input type not supported: "+type)
+
+        if package_type:
+            if len(package_type) > 0:
+                for item in package_type:
+                    try:
+                        index = accepted_targets.index(item)
+                    except ValueError:
+                        invalid_param_request.append(item)
+                        click.echo("Error - package type not supported: "+item)
+            else:
+                try:
+                    index = accepted_targets.index(package_type)
+                except ValueError:
+                    invalid_param_request.append(package_type)
+                    click.echo("Error - package type not supported: "+package_type)
+
+        if len(invalid_param_request) > 0:
+            click.echo("Error - invalid features requested: "+str(invalid_param_request))
+            return
+
+    click.echo("Proceeding...")
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
 
     payload = {
-        'input_type': 'photo'
+        'input_type': type
     }
 
-    if depth != None:
-        payload["input_type"] = "rgbd"
-    else:
-        payload["input_type"] = "photo"
+    i = 0
+    for name in feature_param:
+        payload[name] = feature_param_value[i]
+        i = i + 1
 
-    if len(package_type) > 0:
+    if len(package_type) > 0:           
         payload["transfer_formats"] = package_type
-        package_type = package_type[0]
     else:
-        package_type = "gltf"
+        package_type = "default" #how to get this default value?? glft
 
-    if max_texture != None:
-        payload["max_texture_dimension"] = max_texture
+    #click.echo("payload: "+str(payload))
 
-    for feature_item in feature:
-        payload[feature_item] = 'true'
-
+    depth = None
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
     didimo_id = r.json()['key']
