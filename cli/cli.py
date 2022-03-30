@@ -191,7 +191,7 @@ def new(config, input_type, input, depth, feature, avatar_structure, garment, ge
 
     """
 
-    api_path = "/v3/didimos-new"
+    api_path = "/v3/didimos"
     url = config.api_host + api_path
 
     payload = {
