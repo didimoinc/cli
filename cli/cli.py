@@ -127,7 +127,7 @@ def account(config, raw):
 
 
 @cli.command(short_help="Create a didimo")
-@click.argument("input_type", type=click.Choice(["photo", "photo_body"]), required=True, metavar="TYPE")
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
@@ -138,7 +138,7 @@ def account(config, raw):
               help="Create didimo with optional features. This flag can be used multiple times.")
 @click.option('--avatar-structure', multiple=False,
               type=click.Choice(
-                  ["head-only", "half-body", "full-body"]),
+                  ["head-only", "full-body"]),
               help="Create didimo with avatar structure option.")
 @click.option('--garment', multiple=False,
               type=click.Choice(
@@ -176,8 +176,7 @@ def new(config, input_type, input, depth, feature, avatar_structure, garment, ge
 
     \b
         - photo (input must be a .jpg/.jpeg/.png)
-        - photo_body (input must be a .jpg/.jpeg/.png)
-        - depth (input must be a .png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
 
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
