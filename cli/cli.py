@@ -391,7 +391,7 @@ def hairsdeform(config, input):
         temp_directory_to_extract_to = "temp"
 
         shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
-        
+
         with zipfile.ZipFile(input, 'r') as zip_ref:
             zip_ref.extractall(temp_directory_to_extract_to)
             zip_ref.close()
@@ -436,7 +436,6 @@ def hairsdeform(config, input):
         url = package_itm["__links"]["self"]
         break
 
-    #click.echo(response['key'])
     output = "%s.zip" % key + outputFileSuffix
 
     click.echo("Creating package file.")
@@ -498,8 +497,6 @@ def vertexdeform(config, vertex, user_asset):
     if filePath == "":
         click.echo("Error with path to dmx file")        
         return
-
-    click.echo(outputFileSuffix)
 
     files = [
         ('template_deformation', (filePath, open(
