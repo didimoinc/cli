@@ -413,8 +413,8 @@ def hairsdeform(config, input):
         click.echo("Error with path to dmx file")        
         return
 
-    files = [('template_deformation', (input, open(
-        input, 'rb'), 'application/octet-stream'))]
+    files = [('template_deformation', (filePath, open(
+        filePath, 'rb'), 'application/octet-stream'))]
 
     headers = {
         'DIDIMO-API-KEY': config.access_key
