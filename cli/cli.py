@@ -524,6 +524,8 @@ def vertexdeform(config, vertex, user_asset):
         url = package_itm["__links"]["self"]
         break
 
+    output = "%s.zip" % (key + outputFileSuffix)
+
     click.echo("Creating package file.")
     time.sleep(15)
     download_asset(config, url, api_path, output)
