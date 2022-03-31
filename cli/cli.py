@@ -142,7 +142,7 @@ def account(config, raw):
               help="Create didimo with avatar structure option.")
 @click.option('--garment', multiple=False,
               type=click.Choice(
-                  ["casual", "business", "sporty"]),
+                  ["casual", "sporty"]),
               help="Create didimo with garment option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
