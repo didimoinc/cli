@@ -202,7 +202,7 @@ def list_features(config):
     accepted_input_types = []
     accepted_targets = []
     featureList = list_features_aux(config)
-    click.echo(str(featureList))
+
     click.echo("Accepted features are:")
     for item in featureList:
         if "group" in featureList[item]:
