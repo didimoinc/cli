@@ -3,6 +3,9 @@ import json
 import sys
 import time
 import requests
+import zipfile
+import os
+import re
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto
@@ -365,6 +368,12 @@ def hairsdeform(config, input):
     <INPUT> is your deformation file.
 
     Returns the didimo asset ID that you can use with other commands and hairsdeform package.
+
+    The CLI should accept the zip file, extract de DMX file and send it to the API. 
+
+    The output package should be named after the original didimo key, 
+    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+
     """
 
     api_path = "/v3/assets"
@@ -373,6 +382,32 @@ def hairsdeform(config, input):
     payload = {
         'input_type': 'hairs_deform'
     }
+
+    filePath = ""
+    outputFileSuffix = ""
+
+    if input.endswith('.zip'): 
+        temp_directory_to_extract_to = "temp"
+        with zipfile.ZipFile(input, 'r') as zip_ref:
+            zip_ref.extractall(temp_directory_to_extract_to)
+            zip_ref.close()
+
+        files=os.listdir(temp_directory_to_extract_to)
+        for file in files:
+            if file.endswith('.dmx'):
+                filePath=temp_directory_to_extract_to+'/'+file
+                pathKeySplit = input.replace('.','_').split('_')
+                if len(pathKeySplit)>1:
+                    pathKey = pathKeySplit[1]
+                else: 
+                    pathKey = "key"
+                outputFileSuffix = "_"+pathKey+"_hairs"
+    else:
+        filePath = input
+
+    if filePath == "":
+        click.echo("Error with path to dmx file")        
+        return
 
     files = [('template_deformation', (input, open(
         input, 'rb'), 'application/octet-stream'))]
@@ -398,7 +433,7 @@ def hairsdeform(config, input):
         break
 
     click.echo(response['key'])
-    output = "%s.zip" % key
+    output = "%s%s.zip" % key % outputFileSuffix
 
     click.echo("Creating package file.")
     time.sleep(15)
@@ -417,6 +452,13 @@ def vertexdeform(config, vertex, user_asset):
     <USER_ASSET> is your asset file.
 
     Returns an asset ID of the deformed vertex that you can use with other commands and the package.
+
+    The CLI should accept the zip file, extract de DMX file and sent it (along with the asset to deform, 
+    in case we are using the vertex deform) to the API. 
+    
+    The output package should be named after the original didimo key, 
+    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+
     """
 
     api_path = "/v3/assets"
@@ -424,9 +466,37 @@ def vertexdeform(config, vertex, user_asset):
 
     payload = {'input_type': 'vertex_deform'}
 
+    filePath = ""
+    outputFileSuffix = ""
+
+    if vertex.endswith('.zip'): 
+        temp_directory_to_extract_to = "temp"
+        with zipfile.ZipFile(vertex, 'r') as zip_ref:
+            zip_ref.extractall(temp_directory_to_extract_to)
+            zip_ref.close()
+
+        files=os.listdir(temp_directory_to_extract_to)
+        for file in files:
+            if file.endswith('.dmx'):
+                filePath=temp_directory_to_extract_to+'/'+file
+                pathKeySplit = vertex.replace('.','_').split('_')
+                if len(pathKeySplit)>1:
+                    pathKey = pathKeySplit[1]
+                else: 
+                    pathKey = "key" # TODO: find/decode by pattern? the key in input path string: didimo_yx1280f3wjcasjisdq.zip
+                outputFileSuffix = "_"+pathKey+"_vertexdeformation"
+    else:
+        filePath = vertex
+
+    if filePath == "":
+        click.echo("Error with path to dmx file")        
+        return
+
+    click.echo(outputFileSuffix)
+
     files = [
-        ('template_deformation', (vertex, open(
-            vertex, 'rb'), 'application/octet-stream')),
+        ('template_deformation', (filePath, open(
+            filePath, 'rb'), 'application/octet-stream')),
         ('user_asset', (user_asset, open(user_asset, 'rb'), 'application/octet-stream'))
     ]
 
@@ -451,7 +521,7 @@ def vertexdeform(config, vertex, user_asset):
         break
 
     click.echo(response['key'])
-    output = "%s.zip" % key
+    output = "%s%s.zip" % key % outputFileSuffix
 
     click.echo("Creating package file.")
     time.sleep(15)
