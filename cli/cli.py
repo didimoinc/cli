@@ -6,6 +6,7 @@ import requests
 import zipfile
 import os
 import re
+import shutil
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto
@@ -388,6 +389,9 @@ def hairsdeform(config, input):
 
     if input.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
+
+        shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
+        
         with zipfile.ZipFile(input, 'r') as zip_ref:
             zip_ref.extractall(temp_directory_to_extract_to)
             zip_ref.close()
@@ -432,8 +436,8 @@ def hairsdeform(config, input):
         url = package_itm["__links"]["self"]
         break
 
-    click.echo(response['key'])
-    output = "%s%s.zip" % key % outputFileSuffix
+    #click.echo(response['key'])
+    output = "%s.zip" % key + outputFileSuffix
 
     click.echo("Creating package file.")
     time.sleep(15)
@@ -471,6 +475,9 @@ def vertexdeform(config, vertex, user_asset):
 
     if vertex.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
+
+        shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
+
         with zipfile.ZipFile(vertex, 'r') as zip_ref:
             zip_ref.extractall(temp_directory_to_extract_to)
             zip_ref.close()
@@ -521,7 +528,7 @@ def vertexdeform(config, vertex, user_asset):
         break
 
     click.echo(response['key'])
-    output = "%s%s.zip" % key % outputFileSuffix
+    output = "%s.zip" % key + outputFileSuffix
 
     click.echo("Creating package file.")
     time.sleep(15)
