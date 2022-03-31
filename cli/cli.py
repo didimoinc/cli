@@ -436,7 +436,7 @@ def hairsdeform(config, input):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % key + outputFileSuffix
+    output = "%s.zip" % (key + outputFileSuffix)
 
     click.echo("Creating package file.")
     time.sleep(15)
@@ -523,9 +523,6 @@ def vertexdeform(config, vertex, user_asset):
     for package_itm in r.json()['transfer_formats']:
         url = package_itm["__links"]["self"]
         break
-
-    click.echo(response['key'])
-    output = "%s.zip" % key + outputFileSuffix
 
     click.echo("Creating package file.")
     time.sleep(15)
