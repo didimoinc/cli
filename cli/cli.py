@@ -131,7 +131,7 @@ def list_features_aux(config):
     """
     Get account features based on the pricing model
     """
-    api_path = "/v3/accounts/default/status"
+    api_path = "/v3/accounts/default/status?ui=cli"
     url = config.api_host + api_path
 
     r = http_get(url, auth=DidimoAuth(config, api_path))
@@ -152,18 +152,24 @@ def list_features_aux(config):
                     feature_group = requestConfigObject["group"]
                     #click.echo("Feature: "+requestConfigObject["code"])
                     requestConfigOptions = requestConfigObject["options"]
-                    output[feature_name] = { "group": feature_group, "options":[]}
+                    output[feature_name] = { "group": feature_group, "options":[], "is_input_type": False}
                     is_boolean = False
+                    is_input_type = False
 
                     if requestConfigOptions:
                         for requestConfigOption in requestConfigOptions:
                             if "type" in requestConfigOption and requestConfigOption["type"] == "boolean":
                                 is_boolean = True
                                 break
+                            if "ui" in requestConfigOption and "is_input_type" in requestConfigOption["ui"] and requestConfigOption["ui"]["is_input_type"] == True:
+                                is_input_type = True
+
                             #click.echo(requestConfigOption)
                             #click.echo(requestConfigOption["label"])
                             if "label" in requestConfigOption:
                                 output[feature_name]["options"].append(requestConfigOption["label"])
+
+                    output[feature_name]["is_input_type"] = is_input_type
 
                     if is_boolean:
                         output[feature_name]["options"] = "boolean" 
@@ -196,20 +202,24 @@ def list_features(config):
     accepted_input_types = []
     accepted_targets = []
     featureList = list_features_aux(config)
-
+    click.echo(str(featureList))
     click.echo("Accepted features are:")
     for item in featureList:
         if "group" in featureList[item]:
-            if (str(featureList[item]["group"])) == "recipe":
-                accepted_input_types.append(item)
+            if featureList[item]["is_input_type"] == True: #(str(featureList[item]["group"])) == "recipe":
+                accepted_input_types.append(featureList[item]["options"])
             elif str(featureList[item]["group"]) == "targets":
                 accepted_targets.append(featureList[item]["options"])
-            else:
+            elif str(featureList[item]["group"]) != "input":
                 click.echo(" - "+item+" => "+str(featureList[item]["options"]))
 
     click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
     for item in accepted_input_types:
-        click.echo(" - "+item)
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
 
     click.echo("Package type is the type of output of the didimo. Accepted target values are:")
     for item in accepted_targets:
