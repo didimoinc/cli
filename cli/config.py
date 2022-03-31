@@ -39,10 +39,12 @@ class Config(object):
                         configuration, err=True)
 
     def load(self):
+
         try:
             with click.open_file(Path.home() / ".didimo" / "cli.json", "r") as f:
                 config = json.load(f)
                 self.configuration = config["default"]
+                click.echo("Active Configuration: "+str(config["default"]))
         except FileNotFoundError:
             click.secho(
                 "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
