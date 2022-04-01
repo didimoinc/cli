@@ -146,7 +146,7 @@ def account(config, raw):
               help="Create didimo with garment option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
-                  ["female", "male", "none"]),
+                  ["female", "male", "auto"]),
               help="Create didimo with gender option.")
 @click.option('--max-texture', '-m', multiple=False,
               type=click.Choice(
@@ -207,7 +207,7 @@ def new(config, input_type, input, depth, feature, avatar_structure, garment, ge
         payload["garment"] = garment
 
     if gender != None:
-        if gender == "none":
+        if gender == "auto":
             payload["gender"] = ""
         else:
             payload["gender"] = gender
