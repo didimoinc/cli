@@ -49,6 +49,9 @@ def http_post(url, **kwargs):
 
 
 def http_post_withphoto(url, access_key, payload, photo, photo_depth):
+    return http_post_withphoto(url, access_key, payload, photo, photo_depth, True)
+
+def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code):
 
     if photo_depth != None:
         files = [
@@ -65,9 +68,12 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth):
     r = requests.request("POST", url, headers=headers,
                          data=payload, files=files)
 
-    if r.status_code == 201:
-        return r
+    if check_status_code:
+        if r.status_code == 201:
+            return r
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo("An error has occured. Please check your API key")
+            sys.exit(1)
     else:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo("An error has occured. Please check your API key")
-        sys.exit(1)
+        return r

@@ -397,9 +397,10 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
-        is_error = r.json()['is_error']
+        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+        is_error = r.json()['status'] != 201 or r.json()['is_error']
         if is_error:
+            click.echo("ERROR: "+ str(r.json()))
             click.echo("The requested configuration is invalid! Aborting...")
             exit(1);
 
