@@ -260,12 +260,15 @@ def list_features(config):
 @click.option("--list-features", "-l",
               is_flag=True,
               help="List the available features that can be requested.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost")
 @click.option("--version", "-v",
               type=click.Choice(["2.5"]),
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version):
+def new(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version, ignore_cost):
     """
     Create a didimo
 
@@ -390,6 +393,22 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     #click.echo("payload: "+str(payload))
 
     depth = None
+
+    if not ignore_cost:    
+        # check how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the didimo generation request
+        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        is_error = r.json()['is_error']
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+        click.echo("The cost of this operation is: "+str(estimated_cost))
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
+
+
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
     didimo_id = r.json()['key']
