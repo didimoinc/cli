@@ -1,5 +1,6 @@
 import click
 import sys
+import time
 
 from .network import DidimoAuth, http_get
 from urllib import parse as urlparse
@@ -24,6 +25,36 @@ def get_didimo_status(config, id):
     r = http_get(url, auth=DidimoAuth(config, api_path))
     return r.json()
 
+def get_asset_status(config, id):
+    api_path = "/v3/assets/" + id
+    url = config.api_host + api_path
+    r = http_get(url, auth=DidimoAuth(config, api_path))
+    return r.json()
+
+#Polls the API for progress update until the didimo generation pipeline is finished. Returns 0 if the process is successfull or return 1 if there is an error. 
+def wait_for_dgp_completion(config, key):
+    last_status = ""
+    while True:
+        response = get_asset_status(config, key) 
+        percent = response.get('percent', 100)
+        status = response.get('status', '')
+
+        if status != last_status:
+            last_status = status
+            click.secho("Status: "+str(status))
+
+        if status == "processing":
+            click.secho("Progress: "+str(percent))
+
+        if response['status_message'] != "":
+            click.secho(err=True)
+            click.secho('Error: %s' %
+                        response["status_message"], err=True, fg='red')
+            return 1
+        if response['status'] == 'done':
+            return 0
+        time.sleep(10)
+    return 2 
 
 def download_didimo(config, id, package_type, output_path):
     api_path = "/v3/didimos/" + id

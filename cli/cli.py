@@ -7,7 +7,7 @@ import requests
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto
 from .config import Config
-from .helpers import get_didimo_status, download_didimo, URL, download_asset
+from .helpers import get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
 from ._version import __version__
 
 pass_api = click.make_pass_decorator(Config)
@@ -398,7 +398,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
-        is_error = r.json()['status'] != 201 or r.json()['is_error']
+        is_error = ('status' in r.json() and r.json()['status'] != 201) or ('is_error' in r.json() and r.json()['is_error'])
         if is_error:
             click.echo("ERROR: "+ str(r.json()))
             click.echo("The requested configuration is invalid! Aborting...")
@@ -436,7 +436,6 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
             if output == None:
                 output = "%s_%s.zip" % (didimo_id, package_type)
             download_didimo(config, didimo_id, "", output)
-
 
 @cli.command(short_help='Get status of didimos')
 @click.argument("id", required=True, nargs=-1)
@@ -609,8 +608,11 @@ def hairsdeform(config, input):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    time.sleep(15)
-    download_asset(config, url, api_path, output)
+    error_status = wait_for_dgp_completion(config, key)
+    if error_status:
+        click.echo("There was an error creating package file. Download aborted.")
+    else:
+        download_asset(config, url, api_path, output)
 
 
 @execute.command(short_help="Deform a model to match a didimo shape")
@@ -662,5 +664,8 @@ def vertexdeform(config, vertex, user_asset):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    time.sleep(15)
-    download_asset(config, url, api_path, output)
+    error_status = wait_for_dgp_completion(config, key)
+    if error_status:
+        click.echo("There was an error creating package file. Download aborted.")
+    else:
+        download_asset(config, url, api_path, output)
