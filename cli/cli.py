@@ -564,8 +564,10 @@ def execute(config):
 
 @execute.command(short_help="Produce high fidelity hairs on a didimo")
 @click.argument("input", type=click.Path(exists=True), required=True)
+@click.option("-t", "--timeout", required=False, is_flag=False, default=None,
+              help="Set maximum time allowed for the function to complete.")
 @pass_api
-def hairsdeform(config, input):
+def hairsdeform(config, input, timeout):
     """
     Produce high fidelity hairsdeform on a didimo
 
@@ -608,7 +610,7 @@ def hairsdeform(config, input):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    error_status = wait_for_dgp_completion(config, key)
+    error_status = wait_for_dgp_completion(config, key, timeout)
     if error_status:
         click.echo("There was an error creating package file. Download aborted.")
     else:
@@ -618,8 +620,10 @@ def hairsdeform(config, input):
 @execute.command(short_help="Deform a model to match a didimo shape")
 @click.argument("vertex", required=True, type=click.Path(exists=True))
 @click.argument("user_asset", required=True, type=click.Path(exists=True))
+@click.option("-t", "--timeout", required=False, is_flag=False, default=None,
+              help="Set maximum time allowed for the function to complete.")
 @pass_api
-def vertexdeform(config, vertex, user_asset):
+def vertexdeform(config, vertex, user_asset, timeout):
     """
     Deform a model to match a didimo shape
 
@@ -664,7 +668,7 @@ def vertexdeform(config, vertex, user_asset):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    error_status = wait_for_dgp_completion(config, key)
+    error_status = wait_for_dgp_completion(config, key, timeout)
     if error_status:
         click.echo("There was an error creating package file. Download aborted.")
     else:

@@ -1,6 +1,7 @@
 import click
 import sys
 import time
+import multiprocessing
 
 from .network import DidimoAuth, http_get
 from urllib import parse as urlparse
@@ -32,7 +33,45 @@ def get_asset_status(config, id):
     return r.json()
 
 #Polls the API for progress update until the didimo generation pipeline is finished. Returns 0 if the process is successfull or return 1 if there is an error. 
-def wait_for_dgp_completion(config, key):
+def wait_for_dgp_completion(config, key, timeout):
+
+    click.secho("timeout: "+str(timeout))
+    return_value = -1
+
+    if timeout is not None:
+        # Start foo as a process
+        click.secho("starting thread")
+        p = multiprocessing.Process(target=wait_for_dgp_completion_aux, name="Wait_for_dgp_completion_aux", args=(config,key,return_value))
+        p.start()
+
+        click.secho("started thread")
+        # Wait 10 seconds for foo
+        p.join(float(timeout))
+
+        click.secho("joined thread")
+
+        # If thread is active
+        if p.is_alive():
+            #print "foo is running... let's kill it..."
+            click.secho("wait_for_dgp_completion is running... let's kill it...")
+
+            # Terminate foo
+            p.terminate()
+
+            # Cleanup
+            p.join()
+
+            return 3 #return timeout error
+        else:
+            return return_value #return function result
+    else:
+        click.secho("no timeout execution")
+        wait_for_dgp_completion_aux(config, key, return_value)
+        return return_value
+
+
+def wait_for_dgp_completion_aux(config, key, return_value):
+
     last_status = ""
     while True:
         response = get_asset_status(config, key) 
@@ -50,11 +89,14 @@ def wait_for_dgp_completion(config, key):
             click.secho(err=True)
             click.secho('Error: %s' %
                         response["status_message"], err=True, fg='red')
-            return 1
+            return_value = 1
+            return
         if response['status'] == 'done':
-            return 0
+            return_value = 0
+            return
         time.sleep(10)
-    return 2 
+    return_value = 2
+    return
 
 def download_didimo(config, id, package_type, output_path):
     api_path = "/v3/didimos/" + id
