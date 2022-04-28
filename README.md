@@ -100,9 +100,8 @@ In addition to those, it also accepts the definition of other parameters:
 - garment (--garment)
 - gender (--gender)
 
-Input type now accepts:
+Input type accepts:
 - photo
-- photo_body
 
 Please check all the options and accepted values using the command below.
 
