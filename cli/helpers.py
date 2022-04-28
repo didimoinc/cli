@@ -40,20 +40,15 @@ def wait_for_dgp_completion(config, key, timeout):
 
     if timeout is not None:
         # Start foo as a process
-        click.secho("starting thread")
         p = multiprocessing.Process(target=wait_for_dgp_completion_aux, name="Wait_for_dgp_completion_aux", args=(config,key,return_value))
         p.start()
 
-        click.secho("started thread")
         # Wait 10 seconds for foo
         p.join(float(timeout))
 
-        click.secho("joined thread")
-
         # If thread is active
         if p.is_alive():
-            #print "foo is running... let's kill it..."
-            click.secho("wait_for_dgp_completion is running... let's kill it...")
+            click.secho("Timeout!")
 
             # Terminate foo
             p.terminate()
@@ -65,7 +60,6 @@ def wait_for_dgp_completion(config, key, timeout):
         else:
             return return_value #return function result
     else:
-        click.secho("no timeout execution")
         wait_for_dgp_completion_aux(config, key, return_value)
         return return_value
 
