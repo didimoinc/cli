@@ -35,12 +35,12 @@ def get_asset_status(config, id):
 #Polls the API for progress update until the didimo generation pipeline is finished. Returns 0 if the process is successfull or return 1 if there is an error. 
 def wait_for_dgp_completion(config, key, timeout):
 
-    click.secho("timeout: "+str(timeout))
-    return_value = -1
+    manager = multiprocessing.Manager()
+    return_dict = manager.dict()
 
     if timeout is not None:
         # Start foo as a process
-        p = multiprocessing.Process(target=wait_for_dgp_completion_aux, name="Wait_for_dgp_completion_aux", args=(config,key,return_value))
+        p = multiprocessing.Process(target=wait_for_dgp_completion_aux, name="Wait_for_dgp_completion_aux", args=(config,key,return_dict))
         p.start()
 
         # Wait 10 seconds for foo
@@ -58,13 +58,13 @@ def wait_for_dgp_completion(config, key, timeout):
 
             return 3 #return timeout error
         else:
-            return return_value #return function result
+            return return_dict[0] #return function result
     else:
-        wait_for_dgp_completion_aux(config, key, return_value)
-        return return_value
+        wait_for_dgp_completion_aux(config, key, return_dict)
+        return return_dict[0]
 
 
-def wait_for_dgp_completion_aux(config, key, return_value):
+def wait_for_dgp_completion_aux(config, key, return_dict):
 
     last_status = ""
     while True:
@@ -83,13 +83,14 @@ def wait_for_dgp_completion_aux(config, key, return_value):
             click.secho(err=True)
             click.secho('Error: %s' %
                         response["status_message"], err=True, fg='red')
-            return_value = 1
+            return_dict[0] = 1
             return
         if response['status'] == 'done':
-            return_value = 0
+            return_dict[0] = 0
             return
         time.sleep(10)
-    return_value = 2
+    click.secho("This statement should never be reached...")
+    return_dict[0] = 3
     return
 
 def download_didimo(config, id, package_type, output_path):
