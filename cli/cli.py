@@ -242,10 +242,6 @@ def list_features(config):
               #type=click.Choice(
               #    ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
-#@click.option('--max-texture', '-m', multiple=False,
-#              type=click.Choice(
-#                  ["512", "1024", "2048"]),
-#              help="Create didimo with optional max texture dimension. ")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -278,7 +274,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
 
     \b
         - photo (input must be a .jpg/.jpeg/.png)
-        - depth (input must be a .png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
 
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
