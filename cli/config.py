@@ -39,6 +39,7 @@ class Config(object):
                         configuration, err=True)
 
     def load(self):
+
         try:
             with click.open_file(Path.home() / ".didimo" / "cli.json", "r") as f:
                 config = json.load(f)
