@@ -47,11 +47,7 @@ def http_post(url, **kwargs):
         click.echo(r.text)
         sys.exit(1)
 
-
-def http_post_withphoto(url, access_key, payload, photo, photo_depth):
-    return http_post_withphoto(url, access_key, payload, photo, photo_depth, True)
-
-def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code):
+def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code = True):
 
     if photo_depth != None:
         files = [
