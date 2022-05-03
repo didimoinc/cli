@@ -8,7 +8,7 @@ def print_key_value(key, value, fg="white"):
 
 
 def print_status_header():
-    click.secho("{:<18} │ {:<5} │ {:<7} │ {:^4} │ {:^4}  "
+    click.secho("{:<18} │ {:<10} │ {:<7} │ {:^4} │ {:^4}  "
                 .format(
                     'didimo ID', 'Type', 'Percent', 'Status', 'Created At'),
                 bold=True, err=True)
@@ -19,7 +19,7 @@ def print_status_row(didimo):
 
     # Remove when /status endpoint is consistent with /list
     if didimo.get('status') == "error":
-        click.secho("{:<18} │ {:<5} │ {:<7} │ {:<6} │ {:^4}  "
+        click.secho("{:<18} │ {:<10} │ {:<7} │ {:<6} │ {:^4}  "
                     .format(didimo['key'], "-", "-",
                              didimo['status'].title(), "-"), fg="red")
         return
@@ -43,10 +43,11 @@ def print_status_row(didimo):
         didimo_type = 'vertx'
 
     #created_at = datetime.strptime(didimo['created_at'], "%Y-%m-%d %H:%M:%S")
-    click.secho("{:<18} │ {:<5} │ {:<7} │ {:^7}│ {:^7}"
+    click.secho("{:<18} │ {:<10} │ {:<7} │ {:^7}│ {:^7}"
                 .format(
                     didimo['key'], didimo_type.title(),
                     didimo['percent'],
                     didimo['status'].title(),
                     didimo['created_at']),
                 fg=color)
+
