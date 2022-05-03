@@ -9,17 +9,78 @@ import re
 import shutil
 
 from .utils import print_key_value, print_status_header, print_status_row
-from .network import DidimoAuth, http_get, http_post, http_post_withphoto
+from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
 from .config import Config
 from .helpers import get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
 from ._version import __version__
 
 pass_api = click.make_pass_decorator(Config)
 
-CONTEXT_SETTINGS = dict(help_option_names=['--help', '-h'])
+HELP_OPTION_NAMES=['--help', '-h']
 
+# https://click.palletsprojects.com/en/8.1.x/advanced/
+@click.help_option(*HELP_OPTION_NAMES)
+#@click.pass_context
+class MultiVersionCommandGroup(click.Group):
+    def get_command(self, ctx, cmd_name):
+        if cmd_name == "new":
+            # We are only controlling "new"
 
-@click.group(context_settings=CONTEXT_SETTINGS)
+            Config.load(self, False)
+            Config.load_configuration(self, self.configuration)
+
+            api_version = get_api_version(self)
+            method_suffix_by_api_version = api_version.split("-")[0]
+
+            #print("Current API/DGP Version: "+api_version)
+
+            is_compatible = False
+            for rule in get_cli_version_compatibility_rules(self):
+                regex_expression = re.compile(rule)
+                is_compatible = regex_expression.match(api_version)
+                if is_compatible:
+                    break
+
+            #if not compatible, user is informed that CLI needs to be updated
+            if not is_compatible:
+                print("Compatibility Error - please update Didimo CLI")
+                sys.exit(0)
+
+            #api_version_compatibility_rule = get_cli_version_compatibility_rules(self)[0]
+            #print(">>>>Compatibility rule: "+str(api_version_compatibility_rule))
+
+            #regex_expression = re.compile(api_version_compatibility_rule)
+            #is_compatible = regex_expression.match(api_version)
+
+            method_name = cmd_name + "-" + method_suffix_by_api_version.replace(".", "-")
+            #print(">>>>Using method: "+method_name)
+
+            command = click.Group.get_command(self, ctx, method_name)
+
+            #if no match is found, user is informed that CLI needs to be updated
+            if command is None:
+                print("Error - please update Didimo CLI")
+                sys.exit(0)
+
+            # Force the name to became the original one
+            command.name = "new"
+            return command
+
+        return click.Group.get_command(self, ctx, cmd_name)
+
+    def list_commands(self, ctx):
+        commands = super().list_commands(ctx)
+        # We want "new" (because we need it as a placeholder for `didimo new --help`),
+        # but not new-2-5-5, new-2-5-6, etc.
+        commands = [
+            command
+            for command in commands
+            if command == "new" or not command.startswith("new-")
+        ]
+        return commands
+
+@click.command(cls=MultiVersionCommandGroup)
+@click.help_option(*HELP_OPTION_NAMES)
 @click.option("-c", "--config", help="Use this configuration instead of the default one.")
 @click.pass_context
 def cli(ctx, config):
@@ -36,6 +97,7 @@ def cli(ctx, config):
 
 
 @cli.command(short_help="Initializes configuration")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("name", required=True)
 @click.option('--host', type=URL(), prompt=True, help="API host with protocol.", default="https://api.didimo.co", show_default=True)
 @click.option('--api-key', prompt="API Key", help="API Key from your credentials.")
@@ -51,6 +113,7 @@ def init(config, name, host, api_key, api_secret):
 
 
 @cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
 @click.option("-n", "--number", required=False, default=1, show_default=True,
               help="Number of pages to query from the API. Each page has 10 didimos.")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
@@ -92,6 +155,7 @@ def list(config, number, raw):
 
 
 @cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API.")
 @pass_api
@@ -194,6 +258,7 @@ def list_features_aux(config):
 
 
 @cli.command(short_help="List available features for creating a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
 @pass_api
 def list_features(config):
     """
@@ -235,6 +300,134 @@ def list_features(config):
 
 
 @cli.command(short_help="Create a didimo")
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.argument("input", type=click.Path(exists=True), required=True)
+@click.option('--depth', '-d',
+              type=click.Path(), required=False,
+              help="Create didimo with depth")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["casual", "sporty"]),
+              help="Create didimo with garment option.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "none"]),
+              help="Create didimo with gender option.")
+@click.option('--max-texture', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension. ")
+@click.option('--no-download', '-n', is_flag=True, default=False,
+              help="Do not download didimo")
+@click.option('--no-wait', '-w', is_flag=True, default=False,
+              help="Do not wait for didimo creation and do not download")
+@click.option("--output", "-o", type=click.Path(), required=False,
+              help="Path to download the didimo. If multiple package types "
+              "are present or if the flags --no-wait or --no-download "
+              "are present, this option is ignored. [default: <ID>.zip]")
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option("--version", "-v",
+              type=click.Choice(["2.5"]),
+              default="2.5",
+              help="Version of the didimo.", show_default=True)
+@pass_api
+def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, version):
+    """
+    Create a didimo
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+
+    INPUT is the path to the input file.
+
+    \b
+    Examples:
+        Create a didimo from a photo
+        $ didimo new photo /path/input.jpg
+
+    """
+
+    api_path = "/v3/didimos"
+    url = config.api_host + api_path
+
+    payload = {
+#        'input_type': 'photo'
+    }
+
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if avatar_structure != None:
+        payload["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        payload["garment"] = garment
+
+    if gender != None:
+        if gender == "none":
+            payload["gender"] = ""
+        else:
+            payload["gender"] = gender
+
+
+    if len(package_type) > 0:
+        payload["transfer_formats"] = package_type
+        package_type = package_type[0]
+    else:
+        package_type = "gltf"
+
+    if max_texture != None:
+        payload["max_texture_dimension"] = max_texture
+
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+
+    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+
+    didimo_id = r.json()['key']
+
+    click.echo(didimo_id)
+    if not no_wait:
+        with click.progressbar(length=100, label='Creating didimo') as bar:
+            last_value = 0
+            while True:
+                response = get_didimo_status(config, didimo_id)
+                percent = response.get('percent', 100)
+                update = percent - last_value
+                last_value = percent
+                bar.update(update)
+                if response['status_message'] != "":
+                    click.secho(err=True)
+                    click.secho('Error: %s' %
+                                response["status_message"], err=True, fg='red')
+                    sys.exit(1)
+                if response['status'] == 'done':
+                    break
+                time.sleep(2)
+        if not no_download:
+            if output == None:
+                output = "%s_%s.zip" % (didimo_id, package_type)
+            download_didimo(config, didimo_id, "", output)
+
+
+@cli.command(short_help="Create a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("type", 
             #type=click.Choice(["photo"]), 
             required=True, metavar="TYPE")
@@ -268,7 +461,7 @@ def list_features(config):
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version, ignore_cost):
+def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version, ignore_cost):
     """
     Create a didimo
 
@@ -312,7 +505,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     accepted_input_types = []
     accepted_targets = []
 
-    if feature :
+    if True: #feature :
         for param in feature:
             param_array = param.split("=", param.count(param))
             feature_param.append(param_array[0])
@@ -329,16 +522,21 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
         click.echo("Obtaining input types...")
         for item in featureList:
             if "group" in featureList[item]:
-                if (str(featureList[item]["group"])) == "recipe":
-                    accepted_input_types.append(item)
+                if featureList[item]["is_input_type"] == True: 
+                    if len(featureList[item]["options"]) > 0:
+                        for sub_item in featureList[item]["options"]:
+                            accepted_input_types.append(sub_item.lower())
+                    else:
+                        accepted_input_types.append(featureList[item]["options"].lower())
                 elif str(featureList[item]["group"]) == "targets":
                     if len(featureList[item]["options"]) > 0:
                         for sub_item in featureList[item]["options"]:
-                            accepted_targets.append(sub_item)
+                            accepted_targets.append(sub_item.lower())
                     else:
-                        accepted_targets.append(featureList[item]["options"])
+                        accepted_targets.append(featureList[item]["options"].lower())
         #click.echo(accepted_input_types)
         #click.echo(accepted_targets)
+
 
         click.echo("Crosschecking requested features...")
 
@@ -347,7 +545,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
                 invalid_param_request.append(name)
 
         try:
-            index = accepted_input_types.index(type)
+            index = accepted_input_types.index(type.lower())
         except ValueError:
             invalid_param_request.append(type)
             click.echo("Error - input type not supported: "+type)
@@ -356,13 +554,13 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
             if len(package_type) > 0:
                 for item in package_type:
                     try:
-                        index = accepted_targets.index(item)
+                        index = accepted_targets.index(item.lower())
                     except ValueError:
                         invalid_param_request.append(item)
                         click.echo("Error - package type not supported: "+item)
             else:
                 try:
-                    index = accepted_targets.index(package_type)
+                    index = accepted_targets.index(package_type.lower())
                 except ValueError:
                     invalid_param_request.append(package_type)
                     click.echo("Error - package type not supported: "+package_type)
@@ -377,7 +575,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
     url = config.api_host + api_path
 
     payload = {
-        'input_type': type
+        'input_type': type.lower()
     }
 
     i = 0
@@ -438,6 +636,7 @@ def new(config, type, input, feature, no_download, no_wait, output, package_type
             download_didimo(config, didimo_id, "", output)
 
 @cli.command(short_help='Get status of didimos')
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True, nargs=-1)
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API.")
@@ -499,6 +698,7 @@ def status(config, id, raw, silent):
 
 
 @cli.command(short_help="Get or set configuration")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("name", required=False)
 @pass_api
 def config(config, name):
@@ -518,6 +718,7 @@ def config(config, name):
 
 
 @cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.option("-o", "--output", type=click.Path(),
               help="Download path. [default: <ID>.zip]")
@@ -544,16 +745,18 @@ def download(config, id, output, package_type):
 
 
 @cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
 @pass_api
 def version(config):
     """
-    Print version and exit
+    Print CLI version and exit
     """
-    print(__version__)
+    print("CLI version: "+__version__)
     sys.exit(0)
 
 
 @cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
 @pass_api
 def execute(config):
     """
@@ -563,6 +766,7 @@ def execute(config):
 
 
 @execute.command(short_help="Produce high fidelity hairs on a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option("-t", "--timeout", required=False, is_flag=False, default=None,
               help="Set maximum time allowed for the function to complete.")
@@ -652,6 +856,7 @@ def hairsdeform(config, input, timeout):
 
 
 @execute.command(short_help="Deform a model to match a didimo shape")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("vertex", required=True, type=click.Path(exists=True))
 @click.argument("user_asset", required=True, type=click.Path(exists=True))
 @click.option("-t", "--timeout", required=False, is_flag=False, default=None,
@@ -742,3 +947,90 @@ def vertexdeform(config, vertex, user_asset, timeout):
         click.echo("There was an error creating package file. Download aborted.")
     else:
         download_asset(config, url, api_path, output)
+
+
+#############################################
+
+def get_api_version(config):
+    # Get the current DGP version from the applications using the selected API Key
+    api_path = "/v3/accounts/default/applications"
+    url = config.api_host + api_path
+
+    #r = http_get(url, auth=DidimoAuth(config, api_path))
+    r = cache_this_call(url, config.access_key, auth=DidimoAuth(config, api_path)) 
+
+    if r.status_code != 200:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        sys.exit(1)
+
+    response = r.json()
+
+    for app in response:
+        for app_key in app["api_keys"]:
+            if app_key["key"] == config.access_key:
+                return app["dgp_version"]
+
+    return "api version not found"
+
+def get_cli_version_compatibility_rules(config):
+    #Get the current CLI version compatibility rules 
+
+    api_path = "/v3/platforms/cli"
+    url = config.api_host + api_path
+
+    #r = http_get(url, auth=DidimoAuth(config, api_path))
+    r = cache_this_call(url, config.access_key, auth=DidimoAuth(config, api_path)) 
+
+    if r.status_code != 200:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        sys.exit(1)
+
+    response = r.json()
+
+    #print(response)
+
+    for version in response["versions"]:
+        if version["code"] == __version__:
+            return version["dgp_compatibility_rules"]
+
+    return "CLI version not found"
+
+    return compatibility_json
+
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def version_api(config):
+    """
+    Print API/DGP version and exit
+    """
+    print("API version: "+get_api_version(config))
+    sys.exit(0)
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def version_cli_compatibility_rules(config):
+    """
+    Print CLI/DGP version compatibility rules and exit
+    """
+    print("CLI version - compatibility rules: "+str(get_cli_version_compatibility_rules(config)))
+    sys.exit(0)
+
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def clear_cache(config):
+    """
+    Clears cache and exit
+    """
+    print("Clearing cache...")
+    clear_network_cache() 
+    sys.exit(0)
+
+
+
