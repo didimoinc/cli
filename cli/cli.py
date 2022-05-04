@@ -235,7 +235,7 @@ def list_features_aux(config):
                             #click.echo(requestConfigOption)
                             #click.echo(requestConfigOption["label"])
                             if "label" in requestConfigOption:
-                                output[feature_name]["options"].append(requestConfigOption["label"])
+                                output[feature_name]["options"].append(requestConfigOption["match"])
 
                     output[feature_name]["is_input_type"] = is_input_type
 
@@ -279,7 +279,11 @@ def list_features(config):
                 accepted_input_types.append(featureList[item]["options"])
             elif str(featureList[item]["group"]) == "targets":
                 accepted_targets.append(featureList[item]["options"])
-            elif str(featureList[item]["group"]) != "input":
+            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
+                pass
+            elif str(featureList[item]["group"]) == "input":
+                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
+            else:#elif str(featureList[item]["group"]) != "input":
                 click.echo(" - "+item+" => "+str(featureList[item]["options"]))
 
     click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
