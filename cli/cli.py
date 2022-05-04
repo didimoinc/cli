@@ -298,6 +298,13 @@ def list_features(config):
         else:
             click.echo(" - "+str(item))
 
+@cli.command(short_help="Create a didimo")
+@pass_api
+def new(config):
+    """
+    Create a didimo
+    """
+    pass #this is a dummy function just to show up on the main menu
 
 @cli.command(short_help="Create a didimo")
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
@@ -450,9 +457,6 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
 @click.option('--package-type', '-p', multiple=True,
 #              type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
-@click.option("--list-features", "-l",
-              is_flag=True,
-              help="List the available features that can be requested.", show_default=True)
 @click.option('--ignore-cost', is_flag=True,
               default=False,
               help="Do not prompt user to confirm operation cost")
@@ -461,20 +465,19 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version, ignore_cost):
+def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
     """
     Create a didimo
 
-    TYPE is the type of input used to create the didimo. Use `didimo list-features` to see the accepted values.
+    TYPE is the type of input used to create the didimo. 
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png).
 
     \b
-        - photo (input must be a .jpg/.jpeg/.png)
-        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+    Use `didimo list-features` to see the accepted values.
 
-        For more information on the input types, visit
-        https://developer.didimo.co/docs/cli\b
+    For more information on the input types, visit
+    https://developer.didimo.co/docs/cli\b
 
     \b
     Examples:
