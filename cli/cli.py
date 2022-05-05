@@ -437,7 +437,7 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
             else:
                 if not output.endswith('/'):
                     output = output + "/"
-            download_didimo(config, didimo_id, package_type, output)
+            download_didimo(config, didimo_id, "", output)
 
 
 @cli.command(short_help="Create a didimo")
@@ -646,7 +646,7 @@ def new_2_5_6(config, type, input, feature, no_download, no_wait, output, packag
             else:
                 if not output.endswith('/'):
                     output = output + "/"
-            download_didimo(config, didimo_id, package_type, output)
+            download_didimo(config, didimo_id, "", output)
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
