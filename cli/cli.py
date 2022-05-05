@@ -821,7 +821,6 @@ def hairsdeform(config, input, timeout):
                     pathKey = pathKeySplit[1]
                 else: 
                     pathKey = "key"
-                #outputFileSuffix = "_"+pathKey+"_hairs"
                 outputFilePrefix = pathKey+"_"
     else:
         filePath = input
@@ -853,7 +852,11 @@ def hairsdeform(config, input, timeout):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % (outputFilePrefix + key + outputFileSuffix)
+    curr_dir = os.getcwd()
+    if not curr_dir.endswith('/'):
+        curr_dir = curr_dir + "/"
+
+    output = "%s.zip" % (curr_dir+ outputFilePrefix + key + outputFileSuffix)
 
     click.echo("Creating package file.")
     error_status = wait_for_dgp_completion(config, key, timeout)
@@ -945,7 +948,11 @@ def vertexdeform(config, vertex, user_asset, timeout):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % (key + outputFileSuffix)
+    curr_dir = os.getcwd()
+    if not curr_dir.endswith('/'):
+        curr_dir = curr_dir + "/"
+
+    output = "%s.zip" % (curr_dir + key + outputFileSuffix)
 
     click.echo("Creating package file.")
     error_status = wait_for_dgp_completion(config, key, timeout)
