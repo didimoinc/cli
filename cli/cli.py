@@ -432,9 +432,12 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
                     break
                 time.sleep(2)
         if not no_download:
-            if output == None:
-                output = "%s_%s.zip" % (didimo_id, package_type)
-            download_didimo(config, didimo_id, "", output)
+            if output is None:
+                output = ""
+            else:
+                if not output.endswith('/'):
+                    output = output + "/"
+            download_didimo(config, didimo_id, package_type, output)
 
 
 @cli.command(short_help="Create a didimo")
@@ -638,9 +641,12 @@ def new_2_5_6(config, type, input, feature, no_download, no_wait, output, packag
                     break
                 time.sleep(2)
         if not no_download:
-            if output == None:
-                output = "%s_%s.zip" % (didimo_id, package_type)
-            download_didimo(config, didimo_id, "", output)
+            if output is None:
+                output = ""
+            else:
+                if not output.endswith('/'):
+                    output = output + "/"
+            download_didimo(config, didimo_id, package_type, output)
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
@@ -728,7 +734,7 @@ def config(config, name):
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.option("-o", "--output", type=click.Path(),
-              help="Download path. [default: <ID>.zip]")
+              help="Output path. [default: <ID>.zip]")
 @click.option('--package-type', '-p',
               type=click.Choice(["fbx", "gltf"]),
               help="Specify output type for this didimo.", show_default=True)
@@ -747,7 +753,14 @@ def download(config, id, output, package_type):
         id = sys.stdin.readlines()[0].rstrip()
 
     if output is None:
-        output = "%s_%s.zip" % (id, package_type)
+        curr_dir = os.getcwd()
+        if not curr_dir.endswith('/'):
+            curr_dir = curr_dir + "/"
+
+        output = curr_dir
+    else:
+        if not output.endswith('/'):
+            output = output + "/"
     download_didimo(config, id, package_type, output)
 
 
