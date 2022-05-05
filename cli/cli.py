@@ -780,16 +780,15 @@ def execute(config):
 @pass_api
 def hairsdeform(config, input, timeout):
     """
-    Produce high fidelity hairsdeform on a didimo
+    Produce high fidelity hairstyle deformation for a didimo, given a deformation file
 
-    <INPUT> is your deformation file.
+    <INPUT> is the deformation file (.dmx or .zip containing the DMX file).
 
-    Returns the didimo asset ID that you can use with other commands and hairsdeform package.
-
-    The CLI should accept the zip file, extract de DMX file and send it to the API. 
-
-    The output package should be named after the original didimo key, 
-    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+    The CLI accepts a zip file containing a DMX file, extracting it, or the DMX file directly, 
+    and sends it, along with the asset to deform, to the API. 
+    
+    The output package will be named with a suffix that represents the asset type (“_hairs”). 
+    If the input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
 
@@ -801,7 +800,8 @@ def hairsdeform(config, input, timeout):
     }
 
     filePath = ""
-    outputFileSuffix = ""
+    outputFileSuffix = "_hairs"
+    outputFilePrefix = ""
 
     if input.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
@@ -821,7 +821,8 @@ def hairsdeform(config, input, timeout):
                     pathKey = pathKeySplit[1]
                 else: 
                     pathKey = "key"
-                outputFileSuffix = "_"+pathKey+"_hairs"
+                #outputFileSuffix = "_"+pathKey+"_hairs"
+                outputFilePrefix = pathKey+"_"
     else:
         filePath = input
 
@@ -852,7 +853,7 @@ def hairsdeform(config, input, timeout):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % (key + outputFileSuffix)
+    output = "%s.zip" % (outputFilePrefix + key + outputFileSuffix)
 
     click.echo("Creating package file.")
     error_status = wait_for_dgp_completion(config, key, timeout)
@@ -871,18 +872,16 @@ def hairsdeform(config, input, timeout):
 @pass_api
 def vertexdeform(config, vertex, user_asset, timeout):
     """
-    Deform a model to match a didimo shape
+    Deform an asset to match a didimo shape
 
-    <VERTEX> is your vertex file.
-    <USER_ASSET> is your asset file.
+    <VERTEX> is the deformation file (.dmx or .zip containing the DMX file).
+    <USER_ASSET> is the asset file to be deformed.
 
-    Returns an asset ID of the deformed vertex that you can use with other commands and the package.
-
-    The CLI should accept the zip file, extract de DMX file and sent it (along with the asset to deform, 
-    in case we are using the vertex deform) to the API. 
+    The CLI accepts a zip file containing a DMX file, extracting it, or the DMX file directly, 
+    and sends it, along with the asset to deform, to the API. 
     
-    The output package should be named after the original didimo key, 
-    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+    The output package will be named with a suffix that represents the asset type (“_vertexdeformation”). 
+    If the vertex input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
 
@@ -892,7 +891,7 @@ def vertexdeform(config, vertex, user_asset, timeout):
     payload = {'input_type': 'vertex_deform'}
 
     filePath = ""
-    outputFileSuffix = ""
+    outputFileSuffix = "_vertexdeformation"
 
     if vertex.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
@@ -911,7 +910,7 @@ def vertexdeform(config, vertex, user_asset, timeout):
                 if len(pathKeySplit)>1:
                     pathKey = pathKeySplit[1]
                 else: 
-                    pathKey = "key" # TODO: find/decode by pattern? the key in input path string: didimo_yx1280f3wjcasjisdq.zip
+                    pathKey = "key"
                 outputFileSuffix = "_"+pathKey+"_vertexdeformation"
     else:
         filePath = vertex
