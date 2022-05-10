@@ -56,7 +56,7 @@ class Config(object):
                 "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
             sys.exit(1)
         except json.decoder.JSONDecodeError:
-            click.secho("Error decoding JSON from \"cli.json\"",
+            click.secho("Error decoding JSON from \"cli.json\". Run `didimo init`",
                         err=True, fg='red')
             sys.exit(1)
 
