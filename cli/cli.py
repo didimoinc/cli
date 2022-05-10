@@ -1010,10 +1010,11 @@ def get_api_version(config):
 
     response = r.json()
 
-    for app in response:
-        for app_key in app["api_keys"]:
-            if app_key["key"] == config.access_key:
-                return app["dgp_version"]
+    for app in response["applications"]:
+        if "api_keys" in app:
+            for app_key in app["api_keys"]:
+                if app_key["key"] == config.access_key:
+                    return app["dgp_version"]
 
     return "api version not found"
 
