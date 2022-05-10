@@ -235,7 +235,7 @@ def list_features_aux(config):
                             #click.echo(requestConfigOption)
                             #click.echo(requestConfigOption["label"])
                             if "label" in requestConfigOption:
-                                output[feature_name]["options"].append(requestConfigOption["label"])
+                                output[feature_name]["options"].append(requestConfigOption["match"])
 
                     output[feature_name]["is_input_type"] = is_input_type
 
@@ -279,7 +279,11 @@ def list_features(config):
                 accepted_input_types.append(featureList[item]["options"])
             elif str(featureList[item]["group"]) == "targets":
                 accepted_targets.append(featureList[item]["options"])
-            elif str(featureList[item]["group"]) != "input":
+            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
+                pass
+            elif str(featureList[item]["group"]) == "input":
+                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
+            else:#elif str(featureList[item]["group"]) != "input":
                 click.echo(" - "+item+" => "+str(featureList[item]["options"]))
 
     click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
@@ -298,6 +302,13 @@ def list_features(config):
         else:
             click.echo(" - "+str(item))
 
+@cli.command(short_help="Create a didimo")
+@pass_api
+def new(config):
+    """
+    Create a didimo
+    """
+    pass #this is a dummy function just to show up on the main menu
 
 @cli.command(short_help="Create a didimo")
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
@@ -421,8 +432,11 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
                     break
                 time.sleep(2)
         if not no_download:
-            if output == None:
-                output = "%s_%s.zip" % (didimo_id, package_type)
+            if output is None:
+                output = ""
+            else:
+                if not output.endswith('/'):
+                    output = output + "/"
             download_didimo(config, didimo_id, "", output)
 
 
@@ -450,9 +464,6 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
 @click.option('--package-type', '-p', multiple=True,
 #              type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
-@click.option("--list-features", "-l",
-              is_flag=True,
-              help="List the available features that can be requested.", show_default=True)
 @click.option('--ignore-cost', is_flag=True,
               default=False,
               help="Do not prompt user to confirm operation cost")
@@ -461,20 +472,19 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, list_features, version, ignore_cost):
+def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
     """
     Create a didimo
 
-    TYPE is the type of input used to create the didimo. Use `didimo list-features` to see the accepted values.
+    TYPE is the type of input used to create the didimo. 
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png).
 
     \b
-        - photo (input must be a .jpg/.jpeg/.png)
-        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+    Use `didimo list-features` to see the accepted values.
 
-        For more information on the input types, visit
-        https://developer.didimo.co/docs/cli\b
+    For more information on the input types, visit
+    https://developer.didimo.co/docs/cli\b
 
     \b
     Examples:
@@ -631,8 +641,11 @@ def new_2_5_6(config, type, input, feature, no_download, no_wait, output, packag
                     break
                 time.sleep(2)
         if not no_download:
-            if output == None:
-                output = "%s_%s.zip" % (didimo_id, package_type)
+            if output is None:
+                output = ""
+            else:
+                if not output.endswith('/'):
+                    output = output + "/"
             download_didimo(config, didimo_id, "", output)
 
 @cli.command(short_help='Get status of didimos')
@@ -721,7 +734,7 @@ def config(config, name):
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.option("-o", "--output", type=click.Path(),
-              help="Download path. [default: <ID>.zip]")
+              help="Output path. [default: <ID>.zip]")
 @click.option('--package-type', '-p',
               type=click.Choice(["fbx", "gltf"]),
               help="Specify output type for this didimo.", show_default=True)
@@ -740,7 +753,14 @@ def download(config, id, output, package_type):
         id = sys.stdin.readlines()[0].rstrip()
 
     if output is None:
-        output = "%s_%s.zip" % (id, package_type)
+        curr_dir = os.getcwd()
+        if not curr_dir.endswith('/'):
+            curr_dir = curr_dir + "/"
+
+        output = curr_dir
+    else:
+        if not output.endswith('/'):
+            output = output + "/"
     download_didimo(config, id, package_type, output)
 
 
@@ -773,16 +793,15 @@ def execute(config):
 @pass_api
 def hairsdeform(config, input, timeout):
     """
-    Produce high fidelity hairsdeform on a didimo
+    Produce high fidelity hairstyle deformation for a didimo, given a deformation file
 
-    <INPUT> is your deformation file.
+    <INPUT> is the deformation file (.dmx or .zip containing the DMX file).
 
-    Returns the didimo asset ID that you can use with other commands and hairsdeform package.
-
-    The CLI should accept the zip file, extract de DMX file and send it to the API. 
-
-    The output package should be named after the original didimo key, 
-    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+    The CLI accepts a zip file containing a DMX file, extracting it, or the DMX file directly, 
+    and sends it, along with the asset to deform, to the API. 
+    
+    The output package will be named with a suffix that represents the asset type (“_hairs”). 
+    If the input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
 
@@ -794,7 +813,8 @@ def hairsdeform(config, input, timeout):
     }
 
     filePath = ""
-    outputFileSuffix = ""
+    outputFileSuffix = "_hairs"
+    outputFilePrefix = ""
 
     if input.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
@@ -814,7 +834,7 @@ def hairsdeform(config, input, timeout):
                     pathKey = pathKeySplit[1]
                 else: 
                     pathKey = "key"
-                outputFileSuffix = "_"+pathKey+"_hairs"
+                outputFilePrefix = pathKey+"_"
     else:
         filePath = input
 
@@ -845,7 +865,11 @@ def hairsdeform(config, input, timeout):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % (key + outputFileSuffix)
+    curr_dir = os.getcwd()
+    if not curr_dir.endswith('/'):
+        curr_dir = curr_dir + "/"
+
+    output = "%s.zip" % (curr_dir+ outputFilePrefix + key + outputFileSuffix)
 
     click.echo("Creating package file.")
     error_status = wait_for_dgp_completion(config, key, timeout)
@@ -864,18 +888,16 @@ def hairsdeform(config, input, timeout):
 @pass_api
 def vertexdeform(config, vertex, user_asset, timeout):
     """
-    Deform a model to match a didimo shape
+    Deform an asset to match a didimo shape
 
-    <VERTEX> is your vertex file.
-    <USER_ASSET> is your asset file.
+    <VERTEX> is the deformation file (.dmx or .zip containing the DMX file).
+    <USER_ASSET> is the asset file to be deformed.
 
-    Returns an asset ID of the deformed vertex that you can use with other commands and the package.
-
-    The CLI should accept the zip file, extract de DMX file and sent it (along with the asset to deform, 
-    in case we are using the vertex deform) to the API. 
+    The CLI accepts a zip file containing a DMX file, extracting it, or the DMX file directly, 
+    and sends it, along with the asset to deform, to the API. 
     
-    The output package should be named after the original didimo key, 
-    with a suffix that represents the asset type (“_vertexdeformation” or “_hairs”).
+    The output package will be named with a suffix that represents the asset type (“_vertexdeformation”). 
+    If the vertex input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
 
@@ -885,7 +907,7 @@ def vertexdeform(config, vertex, user_asset, timeout):
     payload = {'input_type': 'vertex_deform'}
 
     filePath = ""
-    outputFileSuffix = ""
+    outputFileSuffix = "_vertexdeformation"
 
     if vertex.endswith('.zip'): 
         temp_directory_to_extract_to = "temp"
@@ -904,7 +926,7 @@ def vertexdeform(config, vertex, user_asset, timeout):
                 if len(pathKeySplit)>1:
                     pathKey = pathKeySplit[1]
                 else: 
-                    pathKey = "key" # TODO: find/decode by pattern? the key in input path string: didimo_yx1280f3wjcasjisdq.zip
+                    pathKey = "key"
                 outputFileSuffix = "_"+pathKey+"_vertexdeformation"
     else:
         filePath = vertex
@@ -939,7 +961,11 @@ def vertexdeform(config, vertex, user_asset, timeout):
         url = package_itm["__links"]["self"]
         break
 
-    output = "%s.zip" % (key + outputFileSuffix)
+    curr_dir = os.getcwd()
+    if not curr_dir.endswith('/'):
+        curr_dir = curr_dir + "/"
+
+    output = "%s.zip" % (curr_dir + key + outputFileSuffix)
 
     click.echo("Creating package file.")
     error_status = wait_for_dgp_completion(config, key, timeout)

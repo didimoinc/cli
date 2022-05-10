@@ -98,10 +98,11 @@ def download_didimo(config, id, package_type, output_path):
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
 
-
     for package_itm in r.json()['transfer_formats']:
         s3url = ""
-        output_path = id+"_"+package_itm["name"] + ".zip"
+        
+        output_filename = id+"_"+package_itm["name"] + ".zip"
+        output_path_full = output_path+output_filename
 
         if package_type == None or len(package_type) == 0:
             s3url = package_itm["__links"]["self"]
@@ -114,13 +115,13 @@ def download_didimo(config, id, package_type, output_path):
             with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
                 r.raise_for_status()
                 zipsize = int(r.headers.get('content-length', 0))
-                with click.open_file(output_path, 'wb') as f:
+                with click.open_file(output_path_full, 'wb') as f:
                     label = "Downloading %s" % id
                     with click.progressbar(length=zipsize, label=label) as bar:
                         for chunk in r.iter_content(chunk_size=2048):
                             size = f.write(chunk)
                             bar.update(size)
-            click.secho('Downloaded to %s' % output_path, fg='blue', err=True)
+            click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
 
         # else:
             # print ("Unable to download")
