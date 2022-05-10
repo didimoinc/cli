@@ -82,6 +82,33 @@ didimo new photo <path to the photo>
 The CLI waits for the didimo to be created and downloads the result in a zip
 file.
 
+Generating a didimo may include several options, as described on our developer portal.
+
+Didimo CLI currently accepts the following features (-f):
+- oculus_lipsync
+- simple_poses
+- arkit
+- aws_polly
+
+The CLI accepts following output formats (-p):
+- glTF
+- FBX
+
+In addition to those, it also accepts the definition of other parameters:
+- the maximum texture dimension (-m)
+- avatar_structure (--avatar_structure)
+- garment (--garment)
+- gender (--gender)
+
+Input type accepts:
+- photo
+
+Please check all the options and accepted values using the command below.
+
+```bash
+didimo new --help
+```
+
 You can list your didimos with:
 
 ```bash

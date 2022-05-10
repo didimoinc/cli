@@ -8,6 +8,11 @@ from hashlib import sha256
 
 from ._version import __version__
 
+import pickle
+import os
+import shutil
+from datetime import datetime
+
 
 class DidimoAuth(requests.auth.AuthBase):
     def __init__(self, config, path):
@@ -47,8 +52,7 @@ def http_post(url, **kwargs):
         click.echo(r.text)
         sys.exit(1)
 
-
-def http_post_withphoto(url, access_key, payload, photo, photo_depth):
+def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code = True):
 
     if photo_depth != None:
         files = [
@@ -65,9 +69,66 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth):
     r = requests.request("POST", url, headers=headers,
                          data=payload, files=files)
 
-    if r.status_code == 201:
-        return r
+    if check_status_code:
+        if r.status_code == 201:
+            return r
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo("An error has occured. Please check your API key")
+            sys.exit(1)
     else:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo("An error has occured. Please check your API key")
-        sys.exit(1)
+        return r
+
+#cache calls in the same day, and only if the call returns a 200 http status
+def cache_this_call(url, access_key, **kwargs):
+    curr_date = datetime.today().strftime('%Y-%m-%d')
+
+    root_temp_dir_path = "temp/"
+    root_cache_dir_path = root_temp_dir_path+"simple_cache/"
+    try:
+        directories = [(f.name, f.path)  for f in os.scandir(root_cache_dir_path) if f.is_dir()]
+        for (directory_name,directory_path) in directories:
+            if not directory_name == curr_date:
+                #print("deleting "+directory_name + " at "+directory_path)
+                shutil.rmtree(directory_path)
+    except OSError as e:
+        #print("Error: %s : %s" % (root_cache_dir_path, e.strerror))
+        pass
+
+    try: 
+        os.mkdir(root_temp_dir_path)
+    except OSError as error: 
+        pass
+
+    try: 
+        os.mkdir(root_cache_dir_path)
+    except OSError as error: 
+        pass
+
+    try: 
+        os.mkdir(root_cache_dir_path+curr_date)
+    except OSError as error: 
+        pass
+
+    filename = root_cache_dir_path+curr_date+"/"+str(sha256((url+"/"+access_key).encode('utf-8')).hexdigest()) 
+
+    if not os.path.exists(filename):
+        #print("no cache")
+        data = http_get(url, **kwargs)
+        if data.status_code == 200:
+            with open(filename, 'wb') as f:
+                pickle.dump(data, f)
+    else:
+        #print("fetching from cache")
+        with open(filename, 'rb') as f:
+            data = pickle.load(f)
+    return data
+
+
+def clear_network_cache():
+    root_cache_dir_path = "temp/simple_cache/"
+    try:
+        shutil.rmtree(root_cache_dir_path)
+    except OSError as e:
+        print("Error: %s : %s" % (root_cache_dir_path, e.strerror))
+
