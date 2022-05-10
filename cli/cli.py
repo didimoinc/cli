@@ -356,7 +356,7 @@ def new(config):
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, version):
+def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
