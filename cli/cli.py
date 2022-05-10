@@ -347,11 +347,15 @@ def new(config):
 @click.option('--package-type', '-p', multiple=True,
               type=click.Choice(["fbx", "gltf"]),
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost")
 @click.option("--version", "-v",
               type=click.Choice(["2.5"]),
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
+#def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
 def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, version):
     """
     Create a didimo
@@ -408,6 +412,20 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
 
     for feature_item in feature:
         payload[feature_item] = 'true'
+
+    if not ignore_cost:    
+        # check how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the didimo generation request
+        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        is_error = r.json()['is_error']
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+        click.echo("The cost of this operation is: "+str(estimated_cost))
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
 
     r = http_post_withphoto(url, config.access_key, payload, input, depth)
 
