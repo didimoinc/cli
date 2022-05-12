@@ -102,6 +102,7 @@ In addition to those, it also accepts the definition of other parameters:
 
 Input type accepts:
 - photo
+- rgbd
 
 Please check all the options and accepted values using the command below.
 
