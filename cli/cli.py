@@ -424,7 +424,7 @@ def hairsdeform(config, input):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    time.sleep(15)
+    time.sleep(55)
     download_asset(config, url, api_path, output)
 
 
@@ -477,5 +477,5 @@ def vertexdeform(config, vertex, user_asset):
     output = "%s.zip" % key
 
     click.echo("Creating package file.")
-    time.sleep(15)
+    time.sleep(55)
     download_asset(config, url, api_path, output)
