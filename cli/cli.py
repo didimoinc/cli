@@ -30,21 +30,24 @@ class MultiVersionCommandGroup(click.Group):
             Config.load_configuration(self, self.configuration)
 
             api_version = get_api_version(self)
+            print (api_version)
             method_suffix_by_api_version = api_version.split("-")[0]
 
             #print("Current API/DGP Version: "+api_version)
 
             is_compatible = False
+            selected_rule = None
             for rule in get_cli_version_compatibility_rules(self):
-                regex_expression = re.compile(rule)
+                regex_expression = re.compile(rule["pattern"])
                 is_compatible = regex_expression.match(api_version)
                 if is_compatible:
+                    selected_rule = rule
                     break
-
+            
             #if not compatible, user is informed that CLI needs to be updated
-            if not is_compatible:
-                print("Compatibility Error - please update Didimo CLI")
-                sys.exit(0)
+            #if not is_compatible:
+            #    print("Compatibility Error - please update Didimo CLI")
+            #    sys.exit(0)
 
             #api_version_compatibility_rule = get_cli_version_compatibility_rules(self)[0]
             #print(">>>>Compatibility rule: "+str(api_version_compatibility_rule))
@@ -52,11 +55,13 @@ class MultiVersionCommandGroup(click.Group):
             #regex_expression = re.compile(api_version_compatibility_rule)
             #is_compatible = regex_expression.match(api_version)
 
-            method_name = cmd_name + "-" + method_suffix_by_api_version.replace(".", "-")
+            #method_name = cmd_name + "-" + method_suffix_by_api_version.replace(".", "-")
+            method_name = cmd_name + "-" + selected_rule["settings"]["cli_signature"].replace("_", "-")
             #print(">>>>Using method: "+method_name)
 
             command = click.Group.get_command(self, ctx, method_name)
 
+            print (f"method_name={method_name}")
             #if no match is found, user is informed that CLI needs to be updated
             if command is None:
                 print("Error - please update Didimo CLI")
@@ -310,16 +315,22 @@ def new(config):
     """
     pass #this is a dummy function just to show up on the main menu
 
+
+
 @cli.command(short_help="Create a didimo")
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
-              help="Create didimo with depth")
+              help="Create didimo with depth.")
 @click.option('--feature', '-f', multiple=True,
               type=click.Choice(
                   ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture-dimension', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension.")
 @click.option('--avatar-structure', multiple=False,
               type=click.Choice(
                   ["head-only", "full-body"]),
@@ -327,19 +338,15 @@ def new(config):
 @click.option('--garment', multiple=False,
               type=click.Choice(
                   ["none","casual", "sporty"]),
-              help="Create didimo with garment option.")
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
                   ["female", "male", "none"]),
-              help="Create didimo with gender option.")
-@click.option('--max-texture', '-m', multiple=False,
-              type=click.Choice(
-                  ["512", "1024", "2048"]),
-              help="Create didimo with optional max texture dimension. ")
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
-              help="Do not download didimo")
+              help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
-              help="Do not wait for didimo creation and do not download")
+              help="Do not wait for didimo creation and do not download.")
 @click.option("--output", "-o", type=click.Path(), required=False,
               help="Path to download the didimo. If multiple package types "
               "are present or if the flags --no-wait or --no-download "
@@ -349,14 +356,14 @@ def new(config):
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
 @click.option('--ignore-cost', is_flag=True,
               default=False,
-              help="Do not prompt user to confirm operation cost")
+              help="Do not prompt user to confirm operation cost.")
 @click.option("--version", "-v",
               type=click.Choice(["2.5"]),
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -490,7 +497,7 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
+def new_dynamic(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
     """
     Create a didimo
 
