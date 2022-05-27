@@ -389,12 +389,15 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
 
     for feature_item in feature:
         payload[feature_item] = 'true'
-
+    
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
+        
         r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
-        is_error = r.json()['is_error']
+        
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
         if is_error:
             click.echo("The requested configuration is invalid! Aborting...")
             exit(1);
@@ -543,7 +546,8 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
-        is_error = r.json()['is_error']
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
         if is_error:
             click.echo("The requested configuration is invalid! Aborting...")
             exit(1);

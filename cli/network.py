@@ -70,7 +70,7 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_stat
                          data=payload, files=files)
 
     if check_status_code:
-        if r.status_code == 201:
+        if r.status_code == 200 or r.status_code == 201:
             return r
         else:
             click.secho('Error %d' % r.status_code, err=True, fg='red')
