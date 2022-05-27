@@ -30,9 +30,6 @@ class MultiVersionCommandGroup(click.Group):
             Config.load_configuration(self, self.configuration)
 
             api_version = get_api_version(self)
-            print (api_version)
-            method_suffix_by_api_version = api_version.split("-")[0]
-
             #print("Current API/DGP Version: "+api_version)
 
             is_compatible = False
@@ -45,6 +42,7 @@ class MultiVersionCommandGroup(click.Group):
                     break
             
             #if not compatible, user is informed that CLI needs to be updated
+            # TODO: This is not a boolean
             #if not is_compatible:
             #    print("Compatibility Error - please update Didimo CLI")
             #    sys.exit(0)
@@ -55,13 +53,10 @@ class MultiVersionCommandGroup(click.Group):
             #regex_expression = re.compile(api_version_compatibility_rule)
             #is_compatible = regex_expression.match(api_version)
 
-            #method_name = cmd_name + "-" + method_suffix_by_api_version.replace(".", "-")
             method_name = cmd_name + "-" + selected_rule["settings"]["cli_signature"].replace("_", "-")
-            #print(">>>>Using method: "+method_name)
 
             command = click.Group.get_command(self, ctx, method_name)
 
-            print (f"method_name={method_name}")
             #if no match is found, user is informed that CLI needs to be updated
             if command is None:
                 print("Error - please update Didimo CLI")
@@ -351,7 +346,7 @@ def new(config):
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_2(config, input_type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -389,8 +384,8 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture, no_downloa
     else:
         package_type = "gltf"
 
-    if max_texture != None:
-        payload["max_texture_dimension"] = max_texture
+    if max_texture_dimension != None:
+        payload["max_texture_dimension"] = max_texture_dimension
 
     for feature_item in feature:
         payload[feature_item] = 'true'
@@ -487,7 +482,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture, no_downloa
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -538,8 +533,8 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
     else:
         package_type = "gltf"
 
-    if max_texture != None:
-        payload["max_texture_dimension"] = max_texture
+    if max_texture_dimension != None:
+        payload["max_texture_dimension"] = max_texture_dimension
 
     for feature_item in feature:
         payload[feature_item] = 'true'
