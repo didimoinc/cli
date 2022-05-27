@@ -413,7 +413,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
 
     click.echo(didimo_id)
     if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo') as bar:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
             last_value = 0
             while True:
                 response = get_didimo_status(config, didimo_id)
@@ -563,7 +563,7 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
 
     click.echo(didimo_id)
     if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo') as bar:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
             last_value = 0
             while True:
                 response = get_didimo_status(config, didimo_id)
@@ -772,7 +772,7 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
 
     click.echo(didimo_id)
     if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo') as bar:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
             last_value = 0
             while True:
                 response = get_didimo_status(config, didimo_id)
