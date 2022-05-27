@@ -331,18 +331,6 @@ def new(config):
               type=click.Choice(
                   ["512", "1024", "2048"]),
               help="Create didimo with optional max texture dimension.")
-@click.option('--avatar-structure', multiple=False,
-              type=click.Choice(
-                  ["head-only", "full-body"]),
-              help="Create didimo with avatar structure option.")
-@click.option('--garment', multiple=False,
-              type=click.Choice(
-                  ["none","casual", "sporty"]),
-              help="Create didimo with garment option. This option is only available for full-body didimos.")
-@click.option('--gender', multiple=False,
-              type=click.Choice(
-                  ["female", "male", "none"]),
-              help="Create didimo with gender option. This option is only available for full-body didimos.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -363,7 +351,7 @@ def new(config):
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_2(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_2(config, input_type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -394,19 +382,6 @@ def new_2_5_2(config, input_type, input, depth, feature, avatar_structure, garme
 
     if input_type != None:
         payload["input_type"] = input_type
-
-    if avatar_structure != None:
-        payload["avatar_structure"] = avatar_structure
-    
-    if garment != None:
-        payload["garment"] = garment
-
-    if gender != None:
-        if gender == "none":
-            payload["gender"] = ""
-        else:
-            payload["gender"] = gender
-
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
