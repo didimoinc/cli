@@ -223,9 +223,16 @@ def list_features_aux(config):
                     output[feature_name] = { "group": feature_group, "options":[], "is_input_type": False}
                     is_boolean = False
                     is_input_type = False
+                    tier_level_restriction = False
+
+                    if "tier_level" in requestConfigObject:
+                        output[feature_name]["tier_level_restriction"] = True
 
                     if requestConfigOptions:
                         for requestConfigOption in requestConfigOptions:
+                            if "tier_level" in requestConfigOption:
+                                tier_level_restriction = True
+
                             if "type" in requestConfigOption and requestConfigOption["type"] == "boolean":
                                 is_boolean = True
                                 break
@@ -252,6 +259,8 @@ def list_features_aux(config):
                                 #print('item not present')
                                 distinct_list.append(item)
                         output[feature_name]["options"] = distinct_list #to remove duplicates
+
+                    output[feature_name]["tier_level_restriction"] = tier_level_restriction
                     #click.echo("----")
                 #click.echo(output)
     return output
@@ -283,6 +292,8 @@ def list_features(config):
                 pass
             elif str(featureList[item]["group"]) == "input":
                 click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
+            elif "tier_level_restriction" in featureList[item] and featureList[item]["tier_level_restriction"] == True: #options - tier_level RESTRICTION 
+                click.echo(" - "+item+" => "+str(featureList[item]["options"])+" - FEATURE OR OPTIONS RESTRICTED BY TIER LEVEL")
             else:#elif str(featureList[item]["group"]) != "input":
                 click.echo(" - "+item+" => "+str(featureList[item]["options"]))
 
