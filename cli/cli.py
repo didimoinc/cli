@@ -30,21 +30,22 @@ class MultiVersionCommandGroup(click.Group):
             Config.load_configuration(self, self.configuration)
 
             api_version = get_api_version(self)
-            method_suffix_by_api_version = api_version.split("-")[0]
-
             #print("Current API/DGP Version: "+api_version)
 
             is_compatible = False
+            selected_rule = None
             for rule in get_cli_version_compatibility_rules(self):
-                regex_expression = re.compile(rule)
+                regex_expression = re.compile(rule["pattern"])
                 is_compatible = regex_expression.match(api_version)
                 if is_compatible:
+                    selected_rule = rule
                     break
-
+            
             #if not compatible, user is informed that CLI needs to be updated
-            if not is_compatible:
-                print("Compatibility Error - please update Didimo CLI")
-                sys.exit(0)
+            # TODO: This is not a boolean
+            #if not is_compatible:
+            #    print("Compatibility Error - please update Didimo CLI")
+            #    sys.exit(0)
 
             #api_version_compatibility_rule = get_cli_version_compatibility_rules(self)[0]
             #print(">>>>Compatibility rule: "+str(api_version_compatibility_rule))
@@ -52,8 +53,7 @@ class MultiVersionCommandGroup(click.Group):
             #regex_expression = re.compile(api_version_compatibility_rule)
             #is_compatible = regex_expression.match(api_version)
 
-            method_name = cmd_name + "-" + method_suffix_by_api_version.replace(".", "-")
-            #print(">>>>Using method: "+method_name)
+            method_name = cmd_name + "-" + selected_rule["settings"]["cli_signature"].replace("_", "-")
 
             command = click.Group.get_command(self, ctx, method_name)
 
@@ -257,9 +257,9 @@ def list_features_aux(config):
     return output
 
 
-@cli.command(short_help="List available features for creating a didimo")
-@click.help_option(*HELP_OPTION_NAMES)
-@pass_api
+#@cli.command(short_help="List available features for creating a didimo")
+#@click.help_option(*HELP_OPTION_NAMES)
+#@pass_api
 def list_features(config):
     """
     List available features for creating a didimo
@@ -310,36 +310,26 @@ def new(config):
     """
     pass #this is a dummy function just to show up on the main menu
 
+
 @cli.command(short_help="Create a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
-              help="Create didimo with depth")
+              help="Create didimo with depth.")
 @click.option('--feature', '-f', multiple=True,
               type=click.Choice(
                   ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
               help="Create didimo with optional features. This flag can be used multiple times.")
-@click.option('--avatar-structure', multiple=False,
-              type=click.Choice(
-                  ["head-only", "full-body"]),
-              help="Create didimo with avatar structure option.")
-@click.option('--garment', multiple=False,
-              type=click.Choice(
-                  ["none","casual", "sporty"]),
-              help="Create didimo with garment option.")
-@click.option('--gender', multiple=False,
-              type=click.Choice(
-                  ["female", "male", "none"]),
-              help="Create didimo with gender option.")
-@click.option('--max-texture', '-m', multiple=False,
+@click.option('--max-texture-dimension', '-m', multiple=False,
               type=click.Choice(
                   ["512", "1024", "2048"]),
-              help="Create didimo with optional max texture dimension. ")
+              help="Create didimo with optional max texture dimension.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
-              help="Do not download didimo")
+              help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
-              help="Do not wait for didimo creation and do not download")
+              help="Do not wait for didimo creation and do not download.")
 @click.option("--output", "-o", type=click.Path(), required=False,
               help="Path to download the didimo. If multiple package types "
               "are present or if the flags --no-wait or --no-download "
@@ -349,14 +339,153 @@ def new(config):
               help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
 @click.option('--ignore-cost', is_flag=True,
               default=False,
-              help="Do not prompt user to confirm operation cost")
+              help="Do not prompt user to confirm operation cost.")
 @click.option("--version", "-v",
               type=click.Choice(["2.5"]),
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+    """
+    Create a didimo
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+
+    INPUT is the path to the input file.
+
+    \b
+    Examples:
+        Create a didimo from a photo
+        $ didimo new photo /path/input.jpg
+
+    """
+
+    api_path = "/v3/didimos"
+    url = config.api_host + api_path
+
+    payload = {
+#        'input_type': 'photo'
+    }
+
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if len(package_type) > 0:
+        payload["transfer_formats"] = package_type
+        package_type = package_type[0]
+    else:
+        package_type = "gltf"
+
+    if max_texture_dimension != None:
+        payload["max_texture_dimension"] = max_texture_dimension
+
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+    
+    if not ignore_cost:    
+        # check how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the didimo generation request
+        
+        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+        click.echo("The cost of this operation is: "+str(estimated_cost))
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
+
+    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+
+    didimo_id = r.json()['key']
+
+    click.echo(didimo_id)
+    if not no_wait:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
+            last_value = 0
+            while True:
+                response = get_didimo_status(config, didimo_id)
+                percent = response.get('percent', 100)
+                update = percent - last_value
+                last_value = percent
+                bar.update(update)
+                if response['status_message'] != "":
+                    click.secho(err=True)
+                    click.secho('Error: %s' %
+                                response["status_message"], err=True, fg='red')
+                    sys.exit(1)
+                if response['status'] == 'done':
+                    break
+                time.sleep(2)
+        if not no_download:
+            if output is None:
+                output = ""
+            else:
+                if not output.endswith('/'):
+                    output = output + "/"
+            download_didimo(config, didimo_id, "", output)
+
+
+@cli.command(short_help="Create a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.argument("input", type=click.Path(exists=True), required=True)
+@click.option('--depth', '-d',
+              type=click.Path(), required=False,
+              help="Create didimo with depth.")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture-dimension', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "none"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--no-download', '-n', is_flag=True, default=False,
+              help="Do not download didimo.")
+@click.option('--no-wait', '-w', is_flag=True, default=False,
+              help="Do not wait for didimo creation and do not download.")
+@click.option("--output", "-o", type=click.Path(), required=False,
+              help="Path to download the didimo. If multiple package types "
+              "are present or if the flags --no-wait or --no-download "
+              "are present, this option is ignored. [default: <ID>.zip]")
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost.")
+@click.option("--version", "-v",
+              type=click.Choice(["2.5"]),
+              default="2.5",
+              help="Version of the didimo.", show_default=True)
+@pass_api
+#def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -407,8 +536,8 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
     else:
         package_type = "gltf"
 
-    if max_texture != None:
-        payload["max_texture_dimension"] = max_texture
+    if max_texture_dimension != None:
+        payload["max_texture_dimension"] = max_texture_dimension
 
     for feature_item in feature:
         payload[feature_item] = 'true'
@@ -417,7 +546,8 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
-        is_error = r.json()['is_error']
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
         if is_error:
             click.echo("The requested configuration is invalid! Aborting...")
             exit(1);
@@ -433,7 +563,7 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
 
     click.echo(didimo_id)
     if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo') as bar:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
             last_value = 0
             while True:
                 response = get_didimo_status(config, didimo_id)
@@ -490,7 +620,7 @@ def new_2_5_5(config, input_type, input, depth, feature, avatar_structure, garme
               default="2.5",
               help="Version of the didimo.", show_default=True)
 @pass_api
-def new_2_5_6(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
+def new_dynamic(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
     """
     Create a didimo
 
@@ -642,7 +772,7 @@ def new_2_5_6(config, type, input, feature, no_download, no_wait, output, packag
 
     click.echo(didimo_id)
     if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo') as bar:
+        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
             last_value = 0
             while True:
                 response = get_didimo_status(config, didimo_id)
