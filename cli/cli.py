@@ -1133,9 +1133,6 @@ def vertexdeform(config, vertex, user_asset, timeout):
     else:
         download_asset(config, url, api_path, output)
 
-
-#############################################
-
 def get_api_version(config):
     # Get the current DGP version from the applications using the selected API Key
     api_path = "/v3/accounts/default/applications"
@@ -1217,6 +1214,4 @@ def clear_cache(config):
     print("Clearing cache...")
     clear_network_cache() 
     sys.exit(0)
-
-
 
