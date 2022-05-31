@@ -257,9 +257,9 @@ def list_features_aux(config):
     return output
 
 
-@cli.command(short_help="List available features for creating a didimo")
-@click.help_option(*HELP_OPTION_NAMES)
-@pass_api
+#@cli.command(short_help="List available features for creating a didimo")
+#@click.help_option(*HELP_OPTION_NAMES)
+#@pass_api
 def list_features(config):
     """
     List available features for creating a didimo
