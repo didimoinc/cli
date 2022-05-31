@@ -38,18 +38,25 @@ class Config(object):
             click.secho("Set \"%s\" as default configuration" %
                         configuration, err=True)
 
-    def load(self):
+    def load(self, log_active_configuration = True):
+
         try:
             with click.open_file(Path.home() / ".didimo" / "cli.json", "r") as f:
                 config = json.load(f)
-                self.configuration = config["default"]
-                click.echo("Active Configuration: "+str(config["default"]))
+                if "default" in config:
+                    self.configuration = config["default"]
+                else:
+                    click.secho(
+                "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
+                    sys.exit(1)
+                if log_active_configuration:
+                    click.echo("Active Configuration: "+str(config["default"]))
         except FileNotFoundError:
             click.secho(
                 "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
             sys.exit(1)
         except json.decoder.JSONDecodeError:
-            click.secho("Error decoding JSON from \"cli.json\"",
+            click.secho("Error decoding JSON from \"cli.json\". Run `didimo init`",
                         err=True, fg='red')
             sys.exit(1)
 
