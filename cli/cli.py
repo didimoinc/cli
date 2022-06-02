@@ -1148,7 +1148,7 @@ def get_api_version(config):
 
     response = r.json()
 
-    for app in response["applications"]:
+    for app in response:
         if "api_keys" in app:
             for app_key in app["api_keys"]:
                 if app_key["key"] == config.access_key:
