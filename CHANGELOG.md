@@ -8,6 +8,10 @@
 *   The expected didimo generated cost is now presented before the actual generation process starts executing
 *   It's now possible to use a didimo package (instead of the DMX) as the input to the deformer actions
 
+#### Bug fixes
+
+*   Fixed false error condition that happened on longer deformation requests
+
 
 <a name="2.2.0"></a>
 ## 2.2.0 (2022-05-12)
