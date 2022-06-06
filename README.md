@@ -2,7 +2,7 @@
 
  - Website: https://www.didimo.co
  - Customer Portal: https://app.didimo.co
- - Documentation: https://docs.didimo.co
+ - Documentation: https://developer.didimo.co
 
 Didimo CLI is a command-line interface to our API.
 
@@ -96,19 +96,29 @@ The CLI accepts following output formats (-p):
 
 In addition to those, it also accepts the definition of other parameters:
 - the maximum texture dimension (-m)
-- avatar_structure (--avatar_structure)
-- garment (--garment)
-- gender (--gender)
+- the avatar structure, which controls the output as a full-body or a head-only didimo (--avatar_structure)
+- the garments that must be applied to a full-body didimo (--garment)
+- the selected body gender for the didimo (--gender)
 
 Input type accepts:
 - photo
-- rgbd
+- rgbd (currently only tested with Apple depth images)
 
 Please check all the options and accepted values using the command below.
 
 ```bash
 didimo new --help
 ```
+
+##### 4. Generate a package with hairs deformed for the newly generated didimo
+
+Now that we have a didimo package, we may generate a package with Didimo's default set of hairs.
+
+```bash
+didimo execute hairsdeform <path to the didimo package>
+```
+
+##### 5. Explore
 
 You can list your didimos with:
 
