@@ -123,7 +123,7 @@ def list(config, number, raw):
     """
     List didimos
     """
-    api_path = "/v3/didimos/"
+    api_path = "/v3/didimos?order_by=-created_at"
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
     if raw:
