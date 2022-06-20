@@ -168,7 +168,7 @@ def account(config, raw):
 
     r = http_get(url, auth=DidimoAuth(config, api_path))
     response = r.json()
-
+    
     if raw:
         click.echo(r.text)
     else:
@@ -177,21 +177,22 @@ def account(config, raw):
         #print (response["owner_profile_uuid"])
         #print (tier)
 
-        api_path2 = "/v3/didimos/"
+        api_path2 = "/v3/didimos?order_by=-created_at"
         url2 = config.api_host + api_path2
 
         #print (url2)
-
+        
         r2 = http_get(url2, auth=DidimoAuth(config, api_path2))
         didimos = r2.json()
-
+        
         print_key_value("Tier", response["tier"]["name"])
         print_key_value("Points", response["balance"])
         print_key_value("Total didimos in account", didimos['total_size'])
-        expiry_message = "\n(!) %s points will expire at %s" % \
-            (response["next_expiration_points"],
-             response["next_expiration_date"])
-        click.secho(expiry_message, fg="yellow", err=True)
+        if "next_expiration_points" in response and "next_expiration_date" in response:
+            expiry_message = "\n(!) %s points will expire at %s" % \
+                (response["next_expiration_points"],
+                response["next_expiration_date"])
+            click.secho(expiry_message, fg="yellow", err=True)
 
 
 
@@ -401,10 +402,10 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
     for feature_item in feature:
         payload[feature_item] = 'true'
     
-    if not ignore_cost:    
+    if not ignore_cost:   
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        
+       
         r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
         
         json_response = r.json()
