@@ -61,7 +61,7 @@ Build Staging Docker Image:
     name: ${CI_REGISTRY}/didimo/rancher-extensions/cli:latest
     entrypoint: [""]
   dependencies: []
-#  script:
+  script:
 #    - rancher --url https://rancher.didimo.co --access-key ${RANCHER_ACCESS_KEY}
 #      --secret-key ${RANCHER_SECRET_KEY} up -d -p --force-upgrade
 #      --confirm-upgrade -s api-v3 -f ci/docker-compose.yml
