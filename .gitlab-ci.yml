@@ -62,6 +62,7 @@ Build Staging Docker Image:
     entrypoint: [""]
   dependencies: []
   script:
+    - echo "running deploy base..."
 #    - rancher --url https://rancher.didimo.co --access-key ${RANCHER_ACCESS_KEY}
 #      --secret-key ${RANCHER_SECRET_KEY} up -d -p --force-upgrade
 #      --confirm-upgrade -s api-v3 -f ci/docker-compose.yml
