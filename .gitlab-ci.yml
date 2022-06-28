@@ -5,7 +5,7 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
 
 .build-template:
-  stage: build
+  stage: build & deploy
   image: docker:latest
   script:
     - echo "DOCKER_TAG=$DOCKER_TAG"
