@@ -10,14 +10,7 @@ variables:
   script:
     - echo "DOCKER_TAG=$DOCKER_TAG"
     - echo -n "${CI_REGISTRY_PASSWORD}" | docker login -u "${CI_REGISTRY_USER}" --password-stdin "${CI_REGISTRY}"
-    #- docker build -f "$CI_PROJECT_DIR"/ci/Dockerfile --pull -t "${CI_REGISTRY_IMAGE}:${DOCKER_TAG}" .
-    #- docker build --pull --build-arg CLI_VERSION="$SOURCE_BRANCH" -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" .
     - docker build --pull --build-arg CLI_VERSION="$SOURCE_BRANCH" -f "$CI_PROJECT_DIR"/Dockerfile  -t "$CI_REGISTRY_IMAGE:${DOCKER_TAG}" . 
-    #- docker push "${CI_REGISTRY_IMAGE}:${DOCKER_TAG}"
-    #- docker tag "$IMAGE_NAME" "$DOCKER_REPO":latest
-    #- echo "DOCKER_REPO=$DOCKER_REPO"
-    #- docker tag "$CI_REGISTRY_IMAGE" "$DOCKER_REPO":latest
-    #- docker push "$DOCKER_REPO":latest
     - docker push "$CI_REGISTRY_IMAGE":${DOCKER_TAG}
     - docker push "$CI_REGISTRY_IMAGE":latest
 
