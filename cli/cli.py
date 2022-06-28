@@ -370,7 +370,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file. It can also be a zip file or a folder containing multiple photos (all files will be treated as input photos).
 
     \b
     Examples:
@@ -378,6 +378,37 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         $ didimo new photo /path/input.jpg
 
     """
+
+    batch_flag = False
+    batch_processing_path = None
+    batch_total_files = 0
+    batch_files = None
+
+    #if (input end with zip or /):
+    if input.endswith('.zip') or os.isdir(input):
+        if input_type != "photo":
+            click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
+            return
+        #if ignore_cost != True:
+        #    echo("Batch processing does not support didimo cost verification. Please use the --ignore-cost option and try again.")
+        #    return
+        else:
+            batch_flag = True
+            #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
+            if input.endswith('.zip'):
+                temp_directory_to_extract_to = "temp"
+                batch_processing_path = temp_directory_to_extract_to+"/"+input.replace(".zip","")
+                shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
+                with zipfile.ZipFile(input, 'r') as zip_ref:
+                    zip_ref.extractall(temp_directory_to_extract_to)
+                    zip_ref.close()
+            elif os.isdir(input):
+                batch_processing_path = input
+            batch_files=os.listdir(batch_processing_path)
+            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            click.echo("Batch processing - path: " + batch_processing_path)
+            click.echo("Batch processing - files count: " + batch_total_files)
+
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -414,39 +445,50 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_flag:
+            total_estimated_cost = estimated_cost * batch_total_files
+            click.echo("The cost of this didimo generation settings is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+    if not batch_flag:
+        batch_files = [input]
 
-    didimo_id = r.json()['key']
+    for input_file in batch_files:
+        r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
 
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
-            else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
+        didimo_id = r.json()['key']
+
+        click.echo(didimo_id)
+        if not no_wait:
+            with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
+                last_value = 0
+                while True:
+                    response = get_didimo_status(config, didimo_id)
+                    percent = response.get('percent', 100)
+                    update = percent - last_value
+                    last_value = percent
+                    bar.update(update)
+                    if response['status_message'] != "":
+                        click.secho(err=True)
+                        click.secho('Error: %s' %
+                                    response["status_message"], err=True, fg='red')
+                        sys.exit(1)
+                    if response['status'] == 'done':
+                        break
+                    time.sleep(2)
+            if not no_download:
+                if output is None:
+                    output = ""
+                else:
+                    if not output.endswith('/'):
+                        output = output + "/"
+                download_didimo(config, didimo_id, "", output)
 
 
 @cli.command(short_help="Create a didimo")
