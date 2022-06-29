@@ -523,6 +523,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             # pid equal to 0 represents the created child process
                             if pid == 0 :
                                 download_didimo(config, didimo_id, "", output)
+                                os._exit(os.EX_OK)
                             else:
                                 break
                         else:
