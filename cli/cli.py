@@ -459,36 +459,82 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
     if not batch_flag:
         batch_files = [input]
 
+    i = 0
+    batch_didimo_ids = []
     for input_file in batch_files:
         r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
-
         didimo_id = r.json()['key']
+        batch_didimo_ids[i] = didimo_id
+        i = i + 1
 
-        click.echo(didimo_id)
+    i = 0
+    fork_child_count = 0
+    for input_file in batch_files:
+
         if not no_wait:
-            with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-                last_value = 0
+
+            didimo_id = batch_didimo_ids[i]
+            i = i + 1
+            click.echo(didimo_id)
+
+            if batch_flag: #fork and don't output progress bars
+
+                no_error = None
                 while True:
                     response = get_didimo_status(config, didimo_id)
-                    percent = response.get('percent', 100)
-                    update = percent - last_value
-                    last_value = percent
-                    bar.update(update)
                     if response['status_message'] != "":
+                        no_error = False
                         click.secho(err=True)
-                        click.secho('Error: %s' %
+                        click.secho('Error generating didimo %s from %s: %s' % didimo_id % str(input_file) %
                                     response["status_message"], err=True, fg='red')
-                        sys.exit(1)
                     if response['status'] == 'done':
+                        no_error = True
                         break
                     time.sleep(2)
-            if not no_download:
-                if output is None:
-                    output = ""
-                else:
-                    if not output.endswith('/'):
-                        output = output + "/"
-                download_didimo(config, didimo_id, "", output)
+                if not no_download and no_error == True:
+                    if output is None:
+                        output = ""
+                    else:
+                        if not output.endswith('/'):
+                            output = output + "/"
+
+                    while True:
+                        if fork_child_count < 5:
+                            #fork download but limit pool to 5 simultanious child processes
+                            fork_child_count = fork_child_count + 1
+                            pid = os.fork()
+                            # pid equal to 0 represents the created child process
+                            if pid == 0 :
+                                download_didimo(config, didimo_id, "", output)
+                            else:
+                                break
+                        else:
+                            time.sleep(1)
+                    
+            else:
+                with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
+                    last_value = 0
+                    while True:
+                        response = get_didimo_status(config, didimo_id)
+                        percent = response.get('percent', 100)
+                        update = percent - last_value
+                        last_value = percent
+                        bar.update(update)
+                        if response['status_message'] != "":
+                            click.secho(err=True)
+                            click.secho('Error: %s' %
+                                        response["status_message"], err=True, fg='red')
+                            sys.exit(1)
+                        if response['status'] == 'done':
+                            break
+                        time.sleep(2)
+                if not no_download:
+                    if output is None:
+                        output = ""
+                    else:
+                        if not output.endswith('/'):
+                            output = output + "/"
+                    download_didimo(config, didimo_id, "", output)
 
 
 @cli.command(short_help="Create a didimo")
