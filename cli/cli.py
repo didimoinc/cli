@@ -194,6 +194,62 @@ def account(config, raw):
         click.secho(expiry_message, fg="yellow", err=True)
 
 
+#@cli.command(short_help="List available features for creating a didimo")
+#@click.help_option(*HELP_OPTION_NAMES)
+#@pass_api
+def list_features(config):
+    """
+    List available features for creating a didimo
+
+    Use the `new` command to use these accepted values.
+
+    """
+
+    accepted_input_types = []
+    accepted_targets = []
+    featureList = list_features_aux(config)
+
+    click.echo("Accepted features are:")
+    for item in featureList:
+        if "group" in featureList[item]:
+            if featureList[item]["is_input_type"] == True: #(str(featureList[item]["group"])) == "recipe":
+                accepted_input_types.append(featureList[item]["options"])
+            elif str(featureList[item]["group"]) == "targets":
+                accepted_targets.append(featureList[item]["options"])
+            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
+                pass
+            elif str(featureList[item]["group"]) == "input":
+                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
+            elif "tier_level_restriction" in featureList[item] and featureList[item]["tier_level_restriction"] == True: #options - tier_level RESTRICTION 
+                click.echo(" - "+item+" => "+str(featureList[item]["options"])+" - FEATURE OR OPTIONS RESTRICTED BY TIER LEVEL")
+            else:#elif str(featureList[item]["group"]) != "input":
+                click.echo(" - "+item+" => "+str(featureList[item]["options"]))
+
+    click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
+    for item in accepted_input_types:
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
+
+    click.echo("Package type is the type of output of the didimo. Accepted target values are:")
+    for item in accepted_targets:
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
+
+@cli.command(short_help="Create a didimo")
+@pass_api
+def new(config):
+    """
+    Create a didimo
+    """
+    pass #this is a dummy function just to show up on the main menu
+
+
 
 def list_features_aux(config):
     """
@@ -266,62 +322,6 @@ def list_features_aux(config):
     return output
 
 
-#@cli.command(short_help="List available features for creating a didimo")
-#@click.help_option(*HELP_OPTION_NAMES)
-#@pass_api
-def list_features(config):
-    """
-    List available features for creating a didimo
-
-    Use the `new` command to use these accepted values.
-
-    """
-
-    accepted_input_types = []
-    accepted_targets = []
-    featureList = list_features_aux(config)
-
-    click.echo("Accepted features are:")
-    for item in featureList:
-        if "group" in featureList[item]:
-            if featureList[item]["is_input_type"] == True: #(str(featureList[item]["group"])) == "recipe":
-                accepted_input_types.append(featureList[item]["options"])
-            elif str(featureList[item]["group"]) == "targets":
-                accepted_targets.append(featureList[item]["options"])
-            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
-                pass
-            elif str(featureList[item]["group"]) == "input":
-                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
-            elif "tier_level_restriction" in featureList[item] and featureList[item]["tier_level_restriction"] == True: #options - tier_level RESTRICTION 
-                click.echo(" - "+item+" => "+str(featureList[item]["options"])+" - FEATURE OR OPTIONS RESTRICTED BY TIER LEVEL")
-            else:#elif str(featureList[item]["group"]) != "input":
-                click.echo(" - "+item+" => "+str(featureList[item]["options"]))
-
-    click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
-    for item in accepted_input_types:
-        if len(item) > 0:
-            for sub_item in item:
-                click.echo(" - "+str(sub_item))
-        else:
-            click.echo(" - "+str(item))
-
-    click.echo("Package type is the type of output of the didimo. Accepted target values are:")
-    for item in accepted_targets:
-        if len(item) > 0:
-            for sub_item in item:
-                click.echo(" - "+str(sub_item))
-        else:
-            click.echo(" - "+str(item))
-
-@cli.command(short_help="Create a didimo")
-@pass_api
-def new(config):
-    """
-    Create a didimo
-    """
-    pass #this is a dummy function just to show up on the main menu
-
-
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
@@ -379,36 +379,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
 
     """
 
-    batch_flag = False
-    batch_processing_path = None
-    batch_total_files = 0
-    batch_files = None
-
-    #if (input end with zip or /):
-    if input.endswith('.zip') or os.isdir(input):
-        if input_type != "photo":
-            click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
-            return
-        #if ignore_cost != True:
-        #    echo("Batch processing does not support didimo cost verification. Please use the --ignore-cost option and try again.")
-        #    return
-        else:
-            batch_flag = True
-            #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
-            if input.endswith('.zip'):
-                temp_directory_to_extract_to = "temp"
-                batch_processing_path = temp_directory_to_extract_to+"/"+input.replace(".zip","")
-                shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
-                with zipfile.ZipFile(input, 'r') as zip_ref:
-                    zip_ref.extractall(temp_directory_to_extract_to)
-                    zip_ref.close()
-            elif os.isdir(input):
-                batch_processing_path = input
-            batch_files=os.listdir(batch_processing_path)
-            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
-            click.echo("Batch processing - path: " + batch_processing_path)
-            click.echo("Batch processing - files count: " + batch_total_files)
-
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -446,9 +417,9 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
 
         estimated_cost = r.json()['cost']
 
-        if batch_flag:
-            total_estimated_cost = estimated_cost * batch_total_files
-            click.echo("The cost of this didimo generation settings is: "+str(estimated_cost))
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
             click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
         else:
             click.echo("The cost of this operation is: "+str(estimated_cost))
@@ -456,9 +427,54 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
-    if not batch_flag:
+    if batch_files == None:
         batch_files = [input]
 
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
+
+
+def new_aux_shared_preprocess_batch_files(input, input_type):
+    """
+    Shared code that handles preprocessing batch files (zip or directory) from the provided input
+    """
+    batch_flag = False
+    batch_processing_path = None
+    batch_total_files = 0
+    batch_files = None
+
+    #if (input end with zip or /):
+    if input.endswith('.zip') or os.isdir(input):
+        if input_type != "photo":
+            click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
+            return None
+        #if ignore_cost != True:
+        #    echo("Batch processing does not support didimo cost verification. Please use the --ignore-cost option and try again.")
+        #    return
+        else:
+            batch_flag = True
+            #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
+            if input.endswith('.zip'):
+                temp_directory_to_extract_to = "temp"
+                batch_processing_path = temp_directory_to_extract_to+"/"+input.replace(".zip","")
+                shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
+                with zipfile.ZipFile(input, 'r') as zip_ref:
+                    zip_ref.extractall(temp_directory_to_extract_to)
+                    zip_ref.close()
+            elif os.isdir(input):
+                batch_processing_path = input
+            batch_files=os.listdir(batch_processing_path)
+            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            click.echo("Batch processing - path: " + batch_processing_path)
+            click.echo("Batch processing - files count: " + batch_total_files)
+            return batch_files
+    
+
+
+
+def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output):
+    """
+    Shared code that handles polling status and managing download
+    """
     i = 0
     batch_didimo_ids = []
     for input_file in batch_files:
@@ -537,6 +553,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
                     download_didimo(config, didimo_id, "", output)
 
 
+
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
@@ -597,7 +614,7 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos)
 
     \b
     Examples:
@@ -605,6 +622,8 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         $ didimo new photo /path/input.jpg
 
     """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -652,39 +671,21 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+    if batch_files == None:
+        batch_files = [input]
 
-    didimo_id = r.json()['key']
-
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
-            else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
 
 
 @cli.command(short_help="Create a didimo")
@@ -725,7 +726,7 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
 
     TYPE is the type of input used to create the didimo. 
 
-    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png).
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos).
 
     \b
     Use `didimo list-features` to see the accepted values.
@@ -753,6 +754,8 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
             $ didimo new photo -f max_texture_dimension=2048 /path/input.jpg
 
     """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     click.echo("")
     click.echo("Obtaining params list...")
@@ -860,40 +863,21 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
+    if batch_files == None:
+        batch_files = [input]
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
-
-    didimo_id = r.json()['key']
-
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
-            else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
