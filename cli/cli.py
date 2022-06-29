@@ -467,7 +467,8 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
             click.echo("Batch processing - path: " + batch_processing_path)
             click.echo("Batch processing - files count: " + batch_total_files)
             return batch_files
-    
+    else:
+        return None
 
 
 
