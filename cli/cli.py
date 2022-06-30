@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import fnmatch
+import psutil
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -519,7 +520,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     click.echo("Checking progress...")
     i = 0
     fork_child_count = 0
-    fork_child_pids = []
+    #fork_child_pids = []
     for input_file in batch_files:
 
         if not no_wait:
@@ -552,7 +553,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         time.sleep(2)
                 if not no_download and no_error == True:
 
-                    click.echo("Downloading didimo "+didimo_id+"...")
+                    #click.echo("Downloading didimo "+didimo_id+"...")
 
                     if output is None:
                         output = ""
@@ -571,8 +572,8 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                                 #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
                                 os._exit(os.EX_OK)
                             else:
-                                #click.echo("parent leaving 0")
-                                fork_child_pids.append(pid)
+                                #click.echo("created child "+str(pid))
+                                #fork_child_pids.append(pid)
                                 break
                         #else:
                         #    time.sleep(1)
@@ -607,10 +608,9 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     #check if child processes are still running and wait for them to finish
     if batch_flag:
         click.echo("Please wait while the remaining files are finished downloading...")
-        while(len(fork_child_pids)>0):
-            child_pid = os.waitpid(0,0)
-            fork_child_pids.remove(child_pid)
-            #click.echo("child_pid finished: "+str(child_pid))
+        while len(psutil.Process().children(recursive=True)) >0:
+            #click.echo("Please wait while the remaining files are finished downloading...")
+            child_pid = os.waitpid(0,0) #format is (pid, fn)
     click.echo("All done!")
 
 @cli.command(short_help="Create a didimo")
