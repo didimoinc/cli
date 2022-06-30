@@ -592,7 +592,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
               help="Create didimo with garment option. This option is only available for full-body didimos.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
-                  ["female", "male", "none"]),
+                  ["female", "male", "auto"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
@@ -655,10 +655,7 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         payload["garment"] = garment
 
     if gender != None:
-        if gender == "none":
-            payload["gender"] = ""
-        else:
-            payload["gender"] = gender
+        payload["gender"] = gender
 
 
     if len(package_type) > 0:
