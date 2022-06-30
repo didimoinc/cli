@@ -489,14 +489,25 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     """
     Shared code that handles polling status and managing download
     """
-    i = 0
-    batch_didimo_ids = []
-    for input_file in batch_files:
-        r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
-        didimo_id = r.json()['key']
-        batch_didimo_ids.append(didimo_id)
-        i = i + 1
+    click.echo("Uploading files...")
 
+    with click.progressbar(length=len(batch_files), label='Uploading files...', show_eta=False) as bar:
+                    last_value = 0
+                    i = 0
+                    batch_didimo_ids = []
+                    for input_file in batch_files:
+                        r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
+                        didimo_id = r.json()['key']
+                        batch_didimo_ids.append(didimo_id)
+                        i = i + 1
+
+                        update = i - last_value
+                        last_value = i
+                        bar.update(update)
+
+                        #click.echo(""+str(i)+"/"+str(len(batch_files)))
+
+    click.echo("Checking progress...")
     i = 0
     fork_child_count = 0
     for input_file in batch_files:
@@ -505,13 +516,15 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
             didimo_id = batch_didimo_ids[i]
             i = i + 1
-            click.echo(didimo_id)
+            #click.echo(didimo_id)
 
             if batch_flag: #fork and don't output progress bars
 
                 no_error = None
                 while True:
                     response = get_didimo_status(config, didimo_id)
+                    #click.echo(response)
+                    click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
                     if response['status_message'] != "":
                         no_error = False
                         click.secho(err=True)
@@ -522,6 +535,9 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         break
                     time.sleep(2)
                 if not no_download and no_error == True:
+
+                    click.echo("Downloading didimo "+didimo_id+"...")
+
                     if output is None:
                         output = ""
                     else:
@@ -529,18 +545,20 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
 
                     while True:
-                        if fork_child_count < 5:
+                        #if fork_child_count < 5:
                             #fork download but limit pool to 5 simultanious child processes
-                            fork_child_count = fork_child_count + 1
+                            #fork_child_count = fork_child_count + 1
                             pid = os.fork()
                             # pid equal to 0 represents the created child process
                             if pid == 0 :
                                 download_didimo(config, didimo_id, "", output)
+                                #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
                                 os._exit(os.EX_OK)
                             else:
+                                #click.echo("parent leaving 0")
                                 break
-                        else:
-                            time.sleep(1)
+                        #else:
+                        #    time.sleep(1)
                     
             else:
                 with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
@@ -567,7 +585,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
                     download_didimo(config, didimo_id, "", output)
 
-
+    click.echo("parent leaving")
 
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
