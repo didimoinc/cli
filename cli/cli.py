@@ -562,7 +562,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
 
                     while True:
-                        #if fork_child_count < 5:
+                        if len(psutil.Process().children(recursive=True)) < 5:
                             #fork download but limit pool to 5 simultanious child processes
                             #fork_child_count = fork_child_count + 1
                             pid = os.fork()
@@ -575,8 +575,8 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                                 #click.echo("created child "+str(pid))
                                 #fork_child_pids.append(pid)
                                 break
-                        #else:
-                        #    time.sleep(1)
+                        else:
+                            time.sleep(1)
                     
             else:
                 with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
