@@ -489,8 +489,8 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     """
     Shared code that handles polling status and managing download
     """
-    click.echo("Uploading files...")
-
+    
+    #click.echo("Uploading files...")
     with click.progressbar(length=len(batch_files), label='Uploading files...', show_eta=False) as bar:
                     last_value = 0
                     i = 0
@@ -551,7 +551,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             pid = os.fork()
                             # pid equal to 0 represents the created child process
                             if pid == 0 :
-                                download_didimo(config, didimo_id, "", output)
+                                download_didimo(config, didimo_id, "", output, False)
                                 #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
                                 os._exit(os.EX_OK)
                             else:
@@ -585,7 +585,13 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
                     download_didimo(config, didimo_id, "", output)
 
+
     click.echo("parent leaving")
+    #check if child processes are still running and wait for them to finish
+    if batch_flag:
+        child_pid = os.waitpid(0,0)
+        click.echo("child_pid finished: "+str(child_pid))
+    click.echo("parent left")
 
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
