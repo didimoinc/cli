@@ -118,6 +118,17 @@ didimo list
 
 For more help, check the documentation on each command with the `--help` option.
 
+### 4. Batch processing
+
+The Didimo CLI supports batch processing of photo inputs automatically. Simply provide a path to a directory containing the input files and all files with be processed.
+Alternatively, you can point to a zip file containing the input files.
+
+```bash
+didimo new photo /path_to_batch_input_files
+```
+
+Currently, only photo input is supported by batch processing.
+
 ### Getting an API Key
 
 Go to the [Customer Portal](https://app.didimo.co) and register for an account.
