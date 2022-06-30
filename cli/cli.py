@@ -431,10 +431,12 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
+    batch_flag = True
     if batch_files == None:
         batch_files = [input]
+        batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
 
 
 def new_aux_shared_preprocess_batch_files(input, input_type):
@@ -483,7 +485,7 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
 
 
 
-def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output):
+def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag):
     """
     Shared code that handles polling status and managing download
     """
@@ -492,7 +494,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     for input_file in batch_files:
         r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
         didimo_id = r.json()['key']
-        batch_didimo_ids[i] = didimo_id
+        batch_didimo_ids.append(didimo_id)
         i = i + 1
 
     i = 0
@@ -696,10 +698,12 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
+    batch_flag = True
     if batch_files == None:
         batch_files = [input]
+        batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
 
 
 @cli.command(short_help="Create a didimo")
@@ -892,10 +896,13 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
+    batch_flag = True
     if batch_files == None:
         batch_files = [input]
+        batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
