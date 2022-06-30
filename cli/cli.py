@@ -7,6 +7,7 @@ import zipfile
 import os
 import re
 import shutil
+import fnmatch
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -407,7 +408,10 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
         
         json_response = r.json()
         is_error = r.json()['is_error'] if 'is_error' in json_response else False
@@ -443,7 +447,7 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
     batch_files = None
 
     #if (input end with zip or /):
-    if input.endswith('.zip') or os.isdir(input):
+    if input.endswith('.zip') or os.path.isdir(input):
         if input_type != "photo":
             click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
             return None
@@ -460,12 +464,19 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                 with zipfile.ZipFile(input, 'r') as zip_ref:
                     zip_ref.extractall(temp_directory_to_extract_to)
                     zip_ref.close()
-            elif os.isdir(input):
+            elif os.path.isdir(input):
                 batch_processing_path = input
             batch_files=os.listdir(batch_processing_path)
             batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
             click.echo("Batch processing - path: " + batch_processing_path)
-            click.echo("Batch processing - files count: " + batch_total_files)
+            click.echo("Batch processing - files count: " + str(batch_total_files))
+
+            path_prefix = input
+            if not path_prefix.endswith('/'):
+                path_prefix = path_prefix + "/"
+            for idx, input_file in enumerate(batch_files):
+                batch_files[idx] = path_prefix + input_file
+
             return batch_files
     else:
         return None
@@ -665,7 +676,11 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+
         json_response = r.json()
         is_error = r.json()['is_error'] if 'is_error' in json_response else False
         if is_error:
@@ -857,7 +872,11 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth, False)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+
         is_error = ('status' in r.json() and r.json()['status'] != 201) or ('is_error' in r.json() and r.json()['is_error'])
         if is_error:
             click.echo("ERROR: "+ str(r.json()))
