@@ -446,7 +446,10 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
     batch_flag = False
     batch_processing_path = None
     batch_total_files = 0
-    batch_files = None
+    temp_batch_files = None
+    batch_files = []
+
+    
 
     #if (input end with zip or /):
     if input.endswith('.zip') or os.path.isdir(input):
@@ -468,16 +471,21 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                     zip_ref.close()
             elif os.path.isdir(input):
                 batch_processing_path = input
-            batch_files=os.listdir(batch_processing_path)
-            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
-            click.echo("Batch processing - path: " + batch_processing_path)
-            click.echo("Batch processing - files count: " + str(batch_total_files))
+            temp_batch_files=os.listdir(batch_processing_path)
+            #batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            #click.echo("Batch processing - path: " + batch_processing_path)
+            #click.echo("Batch processing - files count: " + str(batch_total_files))
 
             path_prefix = input
             if not path_prefix.endswith('/'):
                 path_prefix = path_prefix + "/"
-            for idx, input_file in enumerate(batch_files):
-                batch_files[idx] = path_prefix + input_file
+            for idx, input_file in enumerate(temp_batch_files):
+                #print(input_file)
+                if input_file != ".DS_Store":
+                    batch_files.append(path_prefix + input_file)
+
+            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            click.echo("Batch processing - files count: " + str(batch_total_files))
 
             return batch_files
     else:
