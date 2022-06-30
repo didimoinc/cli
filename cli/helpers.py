@@ -125,7 +125,6 @@ def download_didimo(config, id, package_type, output_path, showProgressBar=True)
                     else:
                         for chunk in r.iter_content(chunk_size=2048):
                             size = f.write(chunk)
-                            bar.update(size)
             if showProgressBar:
                 click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
 

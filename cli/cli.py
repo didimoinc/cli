@@ -409,6 +409,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         
         if batch_files != None:
+            #print(batch_files[0])
             r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
         else:
             r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
@@ -518,6 +519,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     click.echo("Checking progress...")
     i = 0
     fork_child_count = 0
+    fork_child_pids = []
     for input_file in batch_files:
 
         if not no_wait:
@@ -529,19 +531,25 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
             if batch_flag: #fork and don't output progress bars
 
                 no_error = None
-                while True:
-                    response = get_didimo_status(config, didimo_id)
-                    #click.echo(response)
-                    click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
-                    if response['status_message'] != "":
-                        no_error = False
-                        click.secho(err=True)
-                        click.secho('Error generating didimo %s from %s: %s' % didimo_id % str(input_file) %
-                                    response["status_message"], err=True, fg='red')
-                    if response['status'] == 'done':
-                        no_error = True
-                        break
-                    time.sleep(2)
+                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
+                    last_value = 0
+                    while True:
+                        response = get_didimo_status(config, didimo_id)
+                        #click.echo(response)
+                        #click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
+                        percent = response.get('percent', 100)
+                        update = percent - last_value
+                        last_value = percent
+                        bar.update(update)
+                        if response['status_message'] != "":
+                            no_error = False
+                            click.secho(err=True)
+                            click.secho('Error generating didimo %s from %s: %s' % didimo_id % str(input_file) %
+                                        response["status_message"], err=True, fg='red')
+                        if response['status'] == 'done':
+                            no_error = True
+                            break
+                        time.sleep(2)
                 if not no_download and no_error == True:
 
                     click.echo("Downloading didimo "+didimo_id+"...")
@@ -564,6 +572,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                                 os._exit(os.EX_OK)
                             else:
                                 #click.echo("parent leaving 0")
+                                fork_child_pids.append(pid)
                                 break
                         #else:
                         #    time.sleep(1)
@@ -594,12 +603,15 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                     download_didimo(config, didimo_id, "", output)
 
 
-    click.echo("parent leaving")
+    
     #check if child processes are still running and wait for them to finish
     if batch_flag:
-        child_pid = os.waitpid(0,0)
-        click.echo("child_pid finished: "+str(child_pid))
-    click.echo("parent left")
+        click.echo("Please wait while the remaining files are finished downloading...")
+        while(len(fork_child_pids)>0):
+            child_pid = os.waitpid(0,0)
+            fork_child_pids.remove(child_pid)
+            #click.echo("child_pid finished: "+str(child_pid))
+    click.echo("All done!")
 
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
