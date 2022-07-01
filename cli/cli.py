@@ -634,7 +634,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
               help="Create didimo with avatar structure option.")
 @click.option('--garment', multiple=False,
               type=click.Choice(
-                  ["none","casual", "sporty"]),
+                  ["none","casual", "sporty", "business"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
