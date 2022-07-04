@@ -466,6 +466,7 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
             #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
             if input.endswith('.zip'):
                 temp_directory_to_extract_to = "temp"
+                path_prefix = temp_directory_to_extract_to
                 batch_processing_path = temp_directory_to_extract_to+"/"+input.replace(".zip","")
                 shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
                 with zipfile.ZipFile(input, 'r') as zip_ref:
@@ -473,18 +474,22 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                     zip_ref.close()
             elif os.path.isdir(input):
                 batch_processing_path = input
+                path_prefix = input
+            else:
+                click.echo("file not supported")
+                return None
             temp_batch_files=os.listdir(batch_processing_path)
             #batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
             #click.echo("Batch processing - path: " + batch_processing_path)
             #click.echo("Batch processing - files count: " + str(batch_total_files))
 
-            path_prefix = input
             if not path_prefix.endswith('/'):
                 path_prefix = path_prefix + "/"
             for idx, input_file in enumerate(temp_batch_files):
                 #print(input_file)
                 if input_file != ".DS_Store":
                     batch_files.append(path_prefix + input_file)
+                    print(path_prefix + input_file)
 
             batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
             click.echo("Batch processing - files count: " + str(batch_total_files))
