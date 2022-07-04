@@ -114,18 +114,11 @@ def init(config, name, host, api_key, api_secret):
     config.init(name, host, api_key, api_secret)
 
 
-@cli.command()
-@click.help_option(*HELP_OPTION_NAMES)
-@click.option("-n", "--number", required=False, default=1, show_default=True,
-              help="Number of pages to query from the API. Each page has 10 didimos.")
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API, ignoring --number.")
-@pass_api
-def list(config, number, raw):
+def list_aux(config, api_path, number, raw):
     """
     List didimos
     """
-    api_path = "/v3/didimos/"
+
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
     if raw:
@@ -154,6 +147,34 @@ def list(config, number, raw):
         print_status_header()
         for didimo in didimos:
             print_status_row(didimo)
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.option("-n", "--number", required=False, default=1, show_default=True,
+              help="Number of pages to query from the API. Each page has 10 didimos.")
+@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+              help="Do not format output, print raw JSON response from API, ignoring --number.")
+@pass_api
+def list(config, number, raw):
+    """
+    List didimos
+    """
+    api_path = "/v3/didimos/"
+    list_aux(config, api_path, number, raw)
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.option("-n", "--number", required=False, default=1, show_default=True,
+              help="Number of pages to query from the API. Each page has 10 didimos.")
+@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+              help="Do not format output, print raw JSON response from API, ignoring --number.")
+@pass_api
+def list_demo_didimos(config, number, raw):
+    """
+    List demo didimos
+    """
+    api_path = "/v3/didimos/demos"
+    list_aux(config, api_path, number, raw)
 
 
 @cli.command()
@@ -660,16 +681,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                   "hair_008", 
                   "hair_009", 
                   "hair_010", 
-                  "hair_011", 
-                  "hair_101", 
-                  "hair_106", 
-                  "hair_107", 
-                  "hair_108", 
-                  "hair_109", 
-                  "hair_110", 
-                  "hair_111", 
-                  "hair_112", 
-                  "hair_116"]),
+                  "hair_011"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
