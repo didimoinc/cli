@@ -640,6 +640,32 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
               type=click.Choice(
                   ["female", "male", "auto"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "baseball_cap_hair_001", 
+                  "baseball_cap_hair_003",
+                  "hair_001",  
+                  "hair_002", 
+                  "hair_003", 
+                  "hair_004", 
+                  "hair_005", 
+                  "hair_006", 
+                  "hair_007", 
+                  "hair_008", 
+                  "hair_009", 
+                  "hair_010", 
+                  "hair_011", 
+                  "hair_101", 
+                  "hair_106", 
+                  "hair_107", 
+                  "hair_108", 
+                  "hair_109", 
+                  "hair_110", 
+                  "hair_111", 
+                  "hair_112", 
+                  "hair_116"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -660,7 +686,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -703,6 +729,8 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
     if gender != None:
         payload["gender"] = gender
 
+    if hair != None:
+        payload["hair"] = hair
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
