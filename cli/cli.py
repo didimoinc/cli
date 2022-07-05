@@ -486,7 +486,7 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
         else:
             batch_flag = True
             separator = "/"
-            if platform.system() == "windows":
+            if platform.system() == "Windows":
                 separator = "\\"
             #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
             if input.endswith('.zip'):
