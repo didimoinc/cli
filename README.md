@@ -116,6 +116,12 @@ You can list your didimos with:
 didimo list
 ```
 
+To list the demo didimos use:
+
+```bash
+didimo list-demo-didimos
+```
+
 For more help, check the documentation on each command with the `--help` option.
 
 ### 4. Batch processing

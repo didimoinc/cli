@@ -682,7 +682,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                   "hair_009", 
                   "hair_010", 
                   "hair_011"]),
-              help="Create didimo with gender option. This option is only available for full-body didimos.")
+              help="Create didimo with hair option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
