@@ -493,8 +493,11 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                 temp_directory_to_extract_to = "temp"
                 path_prefix = temp_directory_to_extract_to
   
-                head, tail = os.path.split(input)
-                batch_temp_folder_name = tail.replace(".zip","")
+                if not platform.system() == "Windows":
+                    head, tail = os.path.split(input)
+                    batch_temp_folder_name = tail.replace(".zip","")
+                else:
+                    batch_temp_folder_name = ""
 
 
                 directory = os.getcwd()
