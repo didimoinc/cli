@@ -9,6 +9,7 @@ import re
 import shutil
 import fnmatch
 import psutil
+import platform
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -484,6 +485,9 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
         #    return
         else:
             batch_flag = True
+            separator = "/"
+            if platform.system() == "windows":
+                separator = "\\"
             #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
             if input.endswith('.zip'):
                 temp_directory_to_extract_to = "temp"
@@ -492,10 +496,11 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                 head, tail = os.path.split(input)
                 batch_temp_folder_name = tail.replace(".zip","")
 
+
                 directory = os.getcwd()
-                if not directory.endswith('/'):
-                    directory = directory + "/"
-                batch_processing_path = directory+temp_directory_to_extract_to+"/"+batch_temp_folder_name
+                if not directory.endswith(separator):
+                    directory = directory + separator
+                batch_processing_path = directory+temp_directory_to_extract_to+separator+batch_temp_folder_name
                 shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
                 with zipfile.ZipFile(input, 'r') as zip_ref:
                     zip_ref.extractall(temp_directory_to_extract_to)
@@ -511,8 +516,8 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
             #click.echo("Batch processing - path: " + batch_processing_path)
             #click.echo("Batch processing - files count: " + str(batch_total_files))
 
-            if not path_prefix.endswith('/'):
-                path_prefix = path_prefix + "/"
+            if not path_prefix.endswith(separator):
+                path_prefix = path_prefix + separator
             for idx, input_file in enumerate(temp_batch_files):
                 #print(input_file)
                 if input_file != ".DS_Store":
