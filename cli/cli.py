@@ -602,22 +602,25 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         if not output.endswith('/'):
                             output = output + "/"
 
-                    while True:
-                        if len(psutil.Process().children(recursive=True)) < 5:
-                            #fork download but limit pool to 5 simultanious child processes
-                            #fork_child_count = fork_child_count + 1
-                            pid = os.fork()
-                            # pid equal to 0 represents the created child process
-                            if pid == 0 :
-                                download_didimo(config, didimo_id, "", output, False)
-                                #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
-                                os._exit(os.EX_OK)
+                    if platform.system() == "Windows":
+                        download_didimo(config, didimo_id, "", output, False)
+                    else:
+                        while True:
+                            if len(psutil.Process().children(recursive=True)) < 5:
+                                #fork download but limit pool to 5 simultanious child processes
+                                #fork_child_count = fork_child_count + 1
+                                pid = os.fork()
+                                # pid equal to 0 represents the created child process
+                                if pid == 0 :
+                                    download_didimo(config, didimo_id, "", output, False)
+                                    #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
+                                    os._exit(os.EX_OK)
+                                else:
+                                    #click.echo("created child "+str(pid))
+                                    #fork_child_pids.append(pid)
+                                    break
                             else:
-                                #click.echo("created child "+str(pid))
-                                #fork_child_pids.append(pid)
-                                break
-                        else:
-                            time.sleep(1)
+                                time.sleep(1)
                     
             else:
                 with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
