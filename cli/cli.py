@@ -488,7 +488,11 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
             if input.endswith('.zip'):
                 temp_directory_to_extract_to = "temp"
                 path_prefix = temp_directory_to_extract_to
-                batch_processing_path = temp_directory_to_extract_to+"/"+input.replace(".zip","")
+  
+                head, tail = os.path.split(input)
+                batch_temp_folder_name = tail.replace(".zip","")
+                
+                batch_processing_path = temp_directory_to_extract_to+"/"+batch_temp_folder_name
                 shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
                 with zipfile.ZipFile(input, 'r') as zip_ref:
                     zip_ref.extractall(temp_directory_to_extract_to)
