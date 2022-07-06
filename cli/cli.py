@@ -540,8 +540,14 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                     i = 0
                     batch_didimo_ids = []
                     for input_file in batch_files:
-                        r = http_post_withphoto(url, config.access_key, payload, input_file, depth)
-                        didimo_id = r.json()['key']
+                        r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
+
+                        if r.status_code != 200 and r.status_code != 201:
+                            click.secho('Error %d: %d' % (r.status_code,r.text), err=True, fg='red')
+                            didimo_id = None
+                        else:
+                            didimo_id = r.json()['key']
+
                         batch_didimo_ids.append(didimo_id)
                         i = i + 1
 
@@ -561,6 +567,9 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
             didimo_id = batch_didimo_ids[i]
             i = i + 1
+
+            if didimo_id == None:
+                continue
             #click.echo(didimo_id)
 
             if batch_flag: #fork and don't output progress bars
