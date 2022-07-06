@@ -516,7 +516,7 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
                 path_prefix = path_prefix + separator
             for idx, input_file in enumerate(temp_batch_files):
                 #print(input_file)
-                if input_file != ".DS_Store":
+                if input_file != ".DS_Store" and not os.path.isdir(path_prefix + input_file):
                     batch_files.append(path_prefix + input_file)
                     print(path_prefix + input_file)
 
