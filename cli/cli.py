@@ -590,7 +590,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
                     if output is None:
                         output = ""
-                    else:
+                    else if output != "":
                         if not output.endswith('/'):
                             output = output + "/"
 
