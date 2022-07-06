@@ -568,23 +568,29 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                 no_error = None
                 with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
                     last_value = 0
+                    initing_progress_bar = True
                     while True:
-                        response = get_didimo_status(config, didimo_id)
-                        #click.echo(response)
-                        #click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
-                        percent = response.get('percent', 100)
-                        update = percent - last_value
-                        last_value = percent
-                        bar.update(update)
-                        if response['status_message'] != "":
-                            no_error = False
-                            click.secho(err=True)
-                            click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
-                            break
-                        if response['status'] == 'done':
-                            no_error = True
-                            break
+                        if not initing_progress_bar:
+                            response = get_didimo_status(config, didimo_id)
+                            #click.echo(response)
+                            #click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
+                            percent = response.get('percent', 100)
+                            update = percent - last_value
+                            last_value = percent
+                            bar.update(update)
+                            if response['status_message'] != "":
+                                no_error = False
+                                click.secho(err=True)
+                                click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
+                                break
+                            if response['status'] == 'done':
+                                no_error = True
+                                break
+                        else:
+                            bar.update(0)
+                            initing_progress_bar = False
                         time.sleep(2)
+                        
                 if not no_download and no_error == True:
 
                     #click.echo("Downloading didimo "+didimo_id+"...")
