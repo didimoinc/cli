@@ -586,8 +586,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         if response['status_message'] != "":
                             no_error = False
                             click.secho(err=True)
-                            click.secho('Error generating didimo %s from %s: %s' % didimo_id % str(input_file) %
-                                        response["status_message"], err=True, fg='red')
+                            click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
                         if response['status'] == 'done':
                             no_error = True
                             break
