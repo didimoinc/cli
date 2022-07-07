@@ -114,18 +114,18 @@ def download_didimo(config, id, package_type, output_path, showProgressBar=True)
             #print ("downloading....")
             try: 
                 with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
-                r.raise_for_status()
-                zipsize = int(r.headers.get('content-length', 0))
-                with click.open_file(output_path_full, 'wb') as f:
-                    if showProgressBar:
-                        label = "Downloading %s" % id
-                        with click.progressbar(length=zipsize, label=label) as bar:
+                    r.raise_for_status()
+                    zipsize = int(r.headers.get('content-length', 0))
+                    with click.open_file(output_path_full, 'wb') as f:
+                        if showProgressBar:
+                            label = "Downloading %s" % id
+                            with click.progressbar(length=zipsize, label=label) as bar:
+                                for chunk in r.iter_content(chunk_size=2048):
+                                    size = f.write(chunk)
+                                    bar.update(size)
+                        else:
                             for chunk in r.iter_content(chunk_size=2048):
                                 size = f.write(chunk)
-                                bar.update(size)
-                    else:
-                        for chunk in r.iter_content(chunk_size=2048):
-                            size = f.write(chunk)
                 if showProgressBar:
                     click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
             except Exception as error: 
