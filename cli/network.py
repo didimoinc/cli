@@ -12,7 +12,7 @@ import pickle
 import os
 import shutil
 from datetime import datetime
-
+from ._version import __version__
 
 class DidimoAuth(requests.auth.AuthBase):
     def __init__(self, config, path):
@@ -25,7 +25,8 @@ class DidimoAuth(requests.auth.AuthBase):
         r.headers["User-Agent"] = "didimo-cli/%s (%s, %s)" % (__version__,
                                                               platform.python_version(),
                                                               platform.system())
-
+        r.headers["Didimo-Platform"] = "CLI"
+        r.headers["Didimo-Platform-Version"] = __version__
         return r
 
 
