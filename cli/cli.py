@@ -543,7 +543,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
 
                         if r.status_code != 200 and r.status_code != 201:
-                            click.secho('Error %d: %d' % (r.status_code,r.text), err=True, fg='red')
+                            click.secho('Error %d: %s' % (r.status_code,r.text), err=True, fg='red')
                             didimo_id = None
                         else:
                             didimo_id = r.json()['key']
