@@ -117,53 +117,99 @@ def init(config, name, host, api_key, api_secret):
     config.init(name, host, api_key, api_secret)
 
 
-def list_aux(config, api_path, number, raw):
+def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw):
     """
     List didimos
     """
-
     url = config.api_host + api_path
+
+    url = url + "?page="+str(index)
+
+    if page_size != None:
+        url = url + "&page_size="+str(page_size)
+
+    sort_order_api = "-"
+    if sort_order != None:
+        if sort_order == "asc" or sort_order == "ascending":
+            sort_order_api = "+"
+        elif sort_order == "desc" or sort_order == "descending":
+            sort_order_api = "-"
+        else:
+            click.secho("Unknown sort order! Please correct the input. ", fg='red', err=True)
+            exit(1);
+
+    if sort_by != None:
+        url = url + "&order_by="+sort_order_api+sort_by
+
     r = http_get(url, auth=DidimoAuth(config, api_path))
+    json_response = r.json()
+    #print(str(json_response))
+    is_error = r.json()['is_error'] if 'is_error' in json_response else False
+    if is_error:
+        click.echo("An error has occurred! Aborting...")
+        exit(1);
+
     if raw:
         click.echo(r.text)
     else:
 
-        if number < 1:
+        if index < 1:
             sys.exit(0)
 
         didimos = []
-        page = 1
+        next_page = r.json()['__links']['next']
+        page = index
         didimos += r.json()['didimos']
 
-        while page != number:
+        while True:
 
-            next_page = r.json()['__links']['next']
-            if next_page != None:
-                api_path = next_page
-                url = api_path
-                r = http_get(url, auth=DidimoAuth(config, api_path))
-                didimos += r.json()['didimos']
-                page += 1
+            while page != index:
+
+                next_page = r.json()['__links']['next']
+                if next_page != None:
+                    api_path = next_page
+                    url = api_path
+                    r = http_get(url, auth=DidimoAuth(config, api_path))
+                    didimos += r.json()['didimos']
+                    next_page = r.json()['__links']['next']
+                    page += 1
+                else:
+                    break
+
+            print_status_header()
+            for didimo in didimos:
+                print_status_row(didimo)
+
+            if navigate and next_page != None:
+                click.confirm('There are more results. Fetch next page?', abort=True)
+                index = index + 1
+                didimos = []
             else:
                 break
 
-        print_status_header()
-        for didimo in didimos:
-            print_status_row(didimo)
-
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
-@click.option("-n", "--number", required=False, default=1, show_default=True,
-              help="Number of pages to query from the API. Each page has 10 didimos.")
+#@click.option("-n", "--number", required=False, default=1, show_default=True,
+#              help="Number of pages to query from the API. Each page has 10 didimos.")
+@click.option("-p", "--page-size", required=False, default=20, show_default=True,
+              help="Number of didimos per page to query from the API. Default is 20 didimos.")
+@click.option("-i", "--index", required=False, default=1, show_default=True,
+              help="Page index to query from the API. Default is to show the first page.")
+@click.option("-n", "--navigate", required=False,is_flag=True, default=False, show_default=True,
+              help="Prompt to continue navigating subsequent pages.")
+@click.option("-s", "--sort-by", required=False, default="created_at", show_default=True,
+              help="Sort by attribute name.")
+@click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
+              help="Sorting order of the content. Default is descending.")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API, ignoring --number.")
 @pass_api
-def list(config, number, raw):
+def list(config, page_size, index, navigate, sort_by, sort_order, raw):
     """
     List didimos
     """
     api_path = "/v3/didimos/"
-    list_aux(config, api_path, number, raw)
+    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw)
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)

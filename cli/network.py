@@ -43,7 +43,6 @@ def http_get(url, **kwargs):
         click.echo("A Network Error Has Occured")
         sys.exit(1)
 
-
 def http_post(url, **kwargs):
     r = requests.post(url, **kwargs)
     if r.status_code == 200:
@@ -66,7 +65,10 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_stat
     headers = {
         'DIDIMO-API-KEY': access_key,
         'Didimo-Platform': "CLI",
-        'Didimo-Platform-Version':__version__
+        'Didimo-Platform-Version':__version__,
+        'User-Agent': "didimo-cli/%s (%s, %s)" % (__version__,
+                                                              platform.python_version(),
+                                                              platform.system())
     }
 
     r = requests.request("POST", url, headers=headers,
