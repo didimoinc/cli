@@ -10,6 +10,8 @@ import shutil
 import fnmatch
 import psutil
 import platform
+import multiprocessing
+from multiprocessing import Queue, current_process 
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -558,9 +560,8 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         #click.echo(""+str(i)+"/"+str(len(batch_files)))
 
     click.echo("Checking progress...")
+    complete_tasks = Queue()
     i = 0
-    fork_child_count = 0
-    #fork_child_pids = []
     for input_file in batch_files:
 
         if not no_wait:
@@ -610,25 +611,14 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         if not output.endswith('/'):
                             output = output + "/"
 
-                    if platform.system() == "Windows":
-                        download_didimo(config, didimo_id, "", output, False)
-                    else:
-                        while True:
-                            if len(psutil.Process().children(recursive=True)) < 5:
-                                #fork download but limit pool to 5 simultanious child processes
-                                #fork_child_count = fork_child_count + 1
-                                pid = os.fork()
-                                # pid equal to 0 represents the created child process
-                                if pid == 0 :
-                                    download_didimo(config, didimo_id, "", output, False)
-                                    #fork_child_count = fork_child_count - 1 #THIS DOESN'T WORK
-                                    os._exit(os.EX_OK)
-                                else:
-                                    #click.echo("created child "+str(pid))
-                                    #fork_child_pids.append(pid)
-                                    break
-                            else:
-                                time.sleep(1)
+                    while True:
+                        active_child_count = len(jobs)-complete_tasks.qsize()
+                        if active_child_count < 5:
+                            p = multiprocessing.Process(target=test_thread, args=(download_didimo_subprocess,config, didimo_id, "", output, False,complete_tasks,))
+                            jobs.append(p)
+                            p.start()
+                        else:
+                            time.sleep(1)
                     
             else:
                 with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
@@ -655,15 +645,17 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
                     download_didimo(config, didimo_id, "", output)
 
-
-    
     #check if child processes are still running and wait for them to finish
     if batch_flag:
         click.echo("Please wait while the remaining files are finished downloading...")
-        while len(psutil.Process().children(recursive=True)) >0:
-            #click.echo("Please wait while the remaining files are finished downloading...")
-            child_pid = os.waitpid(0,0) #format is (pid, fn)
+        for job in jobs:
+            job.join()
     click.echo("All done!")
+
+def download_didimo_subprocess(config, didimo_id, package_type, output, showProgressBar, complete_tasks):
+    download_didimo(config, didimo_id, package_type, output, showProgressBar)
+    complete_tasks.put(didimo_id + ' is done by ' + current_process().name)
+
 
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
