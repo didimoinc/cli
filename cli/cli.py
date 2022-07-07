@@ -561,6 +561,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
     click.echo("Checking progress...")
     complete_tasks = Queue()
+    jobs = []
     i = 0
     for input_file in batch_files:
 
