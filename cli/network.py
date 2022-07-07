@@ -65,8 +65,8 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_stat
 
     headers = {
         'DIDIMO-API-KEY': access_key,
-        "Didimo-Platform": "CLI",
-        "Didimo-Platform-Version":__version__
+        'Didimo-Platform': "CLI",
+        'Didimo-Platform-Version':__version__
     }
 
     r = requests.request("POST", url, headers=headers,
