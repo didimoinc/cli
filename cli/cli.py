@@ -583,11 +583,12 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
     Shared code that handles polling status and managing download
     """
     
+    batch_didimo_ids = []
     #click.echo("Uploading files...")
     with click.progressbar(length=len(batch_files), label='Uploading files...', show_eta=False) as bar:
                     last_value = 0
                     i = 0
-                    batch_didimo_ids = []
+                    
                     for input_file in batch_files:
                         r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
 
