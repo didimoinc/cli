@@ -157,7 +157,7 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
             sys.exit(0)
 
         didimos = []
-        next_page = r.json()['__links']['next']
+        next_page = json_response['__links']['next'] if '__links' in json_response and 'next' in json_response['__links'] else None
         page = index
         didimos += r.json()['didimos']
 
@@ -165,13 +165,13 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
 
             while page != index:
 
-                next_page = r.json()['__links']['next']
                 if next_page != None:
                     api_path = next_page
                     url = api_path
                     r = http_get(url, auth=DidimoAuth(config, api_path))
-                    didimos += r.json()['didimos']
-                    next_page = r.json()['__links']['next']
+                    json_response = r.json()
+                    didimos += json_response['didimos']
+                    next_page = json_response['__links']['next'] if '__links' in json_response else None
                     page += 1
                 else:
                     break
@@ -223,7 +223,7 @@ def list_demo_didimos(config, number, raw):
     List demo didimos
     """
     api_path = "/v3/didimos/demos"
-    list_aux(config, api_path, number, raw)
+    list_aux(config, api_path, 10, number, False, "created_at", "descending", raw)
 
 
 @cli.command()
