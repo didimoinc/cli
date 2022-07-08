@@ -122,8 +122,6 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
     List didimos
     """
 
-    api_path = "/v3/didimos?order_by=-created_at"
-
     url = config.api_host + api_path
 
     url = url + "?page="+str(index)
