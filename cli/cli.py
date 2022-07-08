@@ -121,6 +121,9 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
     """
     List didimos
     """
+
+    api_path = "/v3/didimos?order_by=-created_at"
+
     url = config.api_host + api_path
 
     url = url + "?page="+str(index)
@@ -240,7 +243,7 @@ def account(config, raw):
 
     r = http_get(url, auth=DidimoAuth(config, api_path))
     response = r.json()
-
+    
     if raw:
         click.echo(r.text)
     else:
@@ -249,21 +252,22 @@ def account(config, raw):
         #print (response["owner_profile_uuid"])
         #print (tier)
 
-        api_path2 = "/v3/didimos/"
+        api_path2 = "/v3/didimos?order_by=-created_at"
         url2 = config.api_host + api_path2
 
         #print (url2)
-
+        
         r2 = http_get(url2, auth=DidimoAuth(config, api_path2))
         didimos = r2.json()
-
+        
         print_key_value("Tier", response["tier"]["name"])
         print_key_value("Points", response["balance"])
         print_key_value("Total didimos in account", didimos['total_size'])
-        expiry_message = "\n(!) %s points will expire at %s" % \
-            (response["next_expiration_points"],
-             response["next_expiration_date"])
-        click.secho(expiry_message, fg="yellow", err=True)
+        if "next_expiration_points" in response and "next_expiration_date" in response:
+            expiry_message = "\n(!) %s points will expire at %s" % \
+                (response["next_expiration_points"],
+                response["next_expiration_date"])
+            click.secho(expiry_message, fg="yellow", err=True)
 
 
 #@cli.command(short_help="List available features for creating a didimo")
@@ -475,10 +479,9 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
     for feature_item in feature:
         payload[feature_item] = 'true'
     
-    if not ignore_cost:    
+    if not ignore_cost:   
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        
         if batch_files != None:
             #print(batch_files[0])
             r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
@@ -727,6 +730,8 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               type=click.Choice(
                   ["none","casual", "sporty", "business"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--include_default_hair_hat', multiple=False, is_flag=True,
+              help="Create didimo with default hair and cap option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
                   ["female", "male", "auto"]),
@@ -746,6 +751,10 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
                   "hair_010", 
                   "hair_011"]),
               help="Create didimo with hair option.")
+@click.option('--profile', multiple=False,
+              help="Create didimo with profile option.")
+@click.option('--shared_resources', multiple=False, is_flag=True,
+              help="Create didimo with shared resources option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -766,7 +775,7 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, include_default_hair_hat, gender, hair, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -811,6 +820,15 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
 
     if hair != None:
         payload["hair"] = hair
+
+    if profile != None:
+        payload["profile"] = profile
+
+    if shared_resources == True:
+        payload["shared_resources"] = "true"
+            
+    if include_default_hair_hat == True:
+        payload["include_default_hair_hat"] = "true"
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
