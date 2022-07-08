@@ -1418,8 +1418,6 @@ def get_api_version(config):
             for app_key in app["api_keys"]:
                 if app_key["key"] == config.access_key:
                     return app["dgp_version"]
-                else:
-                    print(app_key["key"])
 
     return "api version not found"
 
