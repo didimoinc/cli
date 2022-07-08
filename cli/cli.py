@@ -1415,11 +1415,13 @@ def get_api_version(config):
 
     response = r.json()
 
-    for app in response:
+    for app in response["applications"]:
         if "api_keys" in app:
             for app_key in app["api_keys"]:
                 if app_key["key"] == config.access_key:
                     return app["dgp_version"]
+                else:
+                    print(app_key["key"])
 
     return "api version not found"
 
@@ -1438,8 +1440,6 @@ def get_cli_version_compatibility_rules(config):
         sys.exit(1)
 
     response = r.json()
-
-    #print(response)
 
     for version in response["versions"]:
         if version["code"] == __version__:
