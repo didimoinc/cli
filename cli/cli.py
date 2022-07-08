@@ -473,10 +473,16 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
               type=click.Choice(
                   ["none","casual", "sporty"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--include_default_hair_hat', multiple=False, is_flag=True,
+              help="Create didimo with default hair and cap option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
                   ["female", "male", "none"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--profile', multiple=False,
+              help="Create didimo with profile option.")
+@click.option('--shared_resources', multiple=False, is_flag=True,
+              help="Create didimo with shared resources option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -497,7 +503,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, include_default_hair_hat, gender, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -540,6 +546,15 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
             payload["gender"] = ""
         else:
             payload["gender"] = gender
+
+    if profile != None:
+        payload["profile"] = profile
+
+    if shared_resources == True:
+        payload["shared_resources"] = "true"
+            
+    if include_default_hair_hat == True:
+        payload["include_default_hair_hat"] = "true"
 
 
     if len(package_type) > 0:
