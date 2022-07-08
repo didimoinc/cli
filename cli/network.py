@@ -12,7 +12,7 @@ import pickle
 import os
 import shutil
 from datetime import datetime
-
+from ._version import __version__
 
 class DidimoAuth(requests.auth.AuthBase):
     def __init__(self, config, path):
@@ -25,7 +25,8 @@ class DidimoAuth(requests.auth.AuthBase):
         r.headers["User-Agent"] = "didimo-cli/%s (%s, %s)" % (__version__,
                                                               platform.python_version(),
                                                               platform.system())
-
+        r.headers["Didimo-Platform"] = "CLI"
+        r.headers["Didimo-Platform-Version"] = __version__
         return r
 
 
@@ -41,7 +42,6 @@ def http_get(url, **kwargs):
     except:
         click.echo("A Network Error Has Occured")
         sys.exit(1)
-
 
 def http_post(url, **kwargs):
     r = requests.post(url, **kwargs)
@@ -63,7 +63,12 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_stat
         files = [('photo', (photo, open(photo, 'rb'), 'image/jpeg'))]
 
     headers = {
-        'DIDIMO-API-KEY': access_key
+        'DIDIMO-API-KEY': access_key,
+        'Didimo-Platform': "CLI",
+        'Didimo-Platform-Version':__version__,
+        'User-Agent': "didimo-cli/%s (%s, %s)" % (__version__,
+                                                              platform.python_version(),
+                                                              platform.system())
     }
 
     r = requests.request("POST", url, headers=headers,

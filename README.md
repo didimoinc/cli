@@ -2,7 +2,7 @@
 
  - Website: https://www.didimo.co
  - Customer Portal: https://app.didimo.co
- - Documentation: https://docs.didimo.co
+ - Documentation: https://developer.didimo.co
 
 Didimo CLI is a command-line interface to our API.
 
@@ -96,13 +96,13 @@ The CLI accepts following output formats (-p):
 
 In addition to those, it also accepts the definition of other parameters:
 - the maximum texture dimension (-m)
-- avatar_structure (--avatar_structure)
-- garment (--garment)
-- gender (--gender)
+- the avatar structure, which controls the output as a full-body or a head-only didimo (--avatar_structure)
+- the garments that must be applied to a full-body didimo (--garment)
+- the selected body gender for the didimo (--gender)
 
 Input type accepts:
 - photo
-- rgbd
+- rgbd (currently only tested with Apple depth images)
 
 Please check all the options and accepted values using the command below.
 
@@ -110,13 +110,40 @@ Please check all the options and accepted values using the command below.
 didimo new --help
 ```
 
+##### 4. Generate a package with hairs deformed for the newly generated didimo
+
+Now that we have a didimo package, we may generate a package with Didimo's default set of hairs.
+
+```bash
+didimo execute hairsdeform <path to the didimo package>
+```
+
+##### 5. Explore
+
 You can list your didimos with:
 
 ```bash
 didimo list
 ```
 
+To list the demo didimos use:
+
+```bash
+didimo list-demo-didimos
+```
+
 For more help, check the documentation on each command with the `--help` option.
+
+### 4. Batch processing
+
+The Didimo CLI supports batch processing of photo inputs automatically. Simply provide a path to a directory containing the input files and all files with be processed.
+Alternatively, you can point to a zip file containing the input files.
+
+```bash
+didimo new photo /path_to_batch_input_files
+```
+
+Currently, only photo input is supported by batch processing.
 
 ### Getting an API Key
 
