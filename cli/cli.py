@@ -664,7 +664,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                     while True:
                         active_child_count = len(jobs)-complete_tasks.qsize()
                         if active_child_count < 5:
-                            p = multiprocessing.Process(target=test_thread, args=(download_didimo_subprocess,config, didimo_id, "", output, False,complete_tasks,))
+                            p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
                             jobs.append(p)
                             p.start()
                         else:
