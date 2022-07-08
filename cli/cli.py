@@ -734,8 +734,6 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
 @click.option('--hair', multiple=False,
               type=click.Choice(
                   ["baseball_cap", 
-                  "baseball_cap_hair_001", 
-                  "baseball_cap_hair_003",
                   "hair_001",  
                   "hair_002", 
                   "hair_003", 
