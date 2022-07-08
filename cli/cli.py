@@ -202,7 +202,7 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
 @click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
               help="Sorting order of the content. Default is descending.")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API, ignoring --number.")
+              help="Do not format output, print raw JSON response from API.")
 @pass_api
 def list(config, page_size, index, navigate, sort_by, sort_order, raw):
     """
