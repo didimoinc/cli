@@ -670,7 +670,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             time.sleep(1)
                     
             else:
-                with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
+                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
                     last_value = 0
                     while True:
                         response = get_didimo_status(config, didimo_id)
