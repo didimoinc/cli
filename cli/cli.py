@@ -593,7 +593,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
 
                         if r.status_code != 200 and r.status_code != 201:
-                            click.secho('Error %d: %s' % (r.status_code,r.text), err=True, fg='red')
+                            click.secho('\nError %d uploading %s: %s' % (r.status_code, input_file, r.text), err=True, fg='red')
                             didimo_id = None
                         else:
                             didimo_id = r.json()['key']
@@ -666,7 +666,9 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
                             jobs.append(p)
                             p.start()
+                            break
                         else:
+                            #click.echo("Waiting to download | Jobs:"+str(len(jobs))+" | Active processes:"+str(active_child_count)+" | Completed:"+str(complete_tasks.qsize()))
                             time.sleep(1)
                     
             else:
@@ -729,8 +731,6 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               type=click.Choice(
                   ["none","casual", "sporty", "business"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
-@click.option('--include_default_hair_hat', multiple=False, is_flag=True,
-              help="Create didimo with default hair and cap option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
                   ["female", "male", "auto"]),
@@ -774,7 +774,7 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, include_default_hair_hat, gender, hair, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -825,9 +825,6 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
 
     if shared_resources == True:
         payload["shared_resources"] = "true"
-            
-    if include_default_hair_hat == True:
-        payload["include_default_hair_hat"] = "true"
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type

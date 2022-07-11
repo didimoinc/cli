@@ -111,7 +111,7 @@ def download_didimo(config, id, package_type, output_path, showProgressBar=True)
                 s3url = package_itm["__links"]["self"]
 
         if s3url != "":
-            #print ("downloading....")
+            #print ("downloading.... "+s3url)
             try: 
                 with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
                     r.raise_for_status()
@@ -124,7 +124,7 @@ def download_didimo(config, id, package_type, output_path, showProgressBar=True)
                                     size = f.write(chunk)
                                     bar.update(size)
                         else:
-                            for chunk in r.iter_content(chunk_size=2048):
+                            for chunk in r.iter_content(chunk_size=zipsize):
                                 size = f.write(chunk)
                 if showProgressBar:
                     click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
