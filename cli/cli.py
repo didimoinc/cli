@@ -117,7 +117,7 @@ def init(config, name, host, api_key, api_secret):
     config.init(name, host, api_key, api_secret)
 
 
-def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw):
+def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, filter, raw):
     """
     List didimos
     """
@@ -141,6 +141,55 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
 
     if sort_by != None:
         url = url + "&order_by="+sort_order_api+sort_by
+
+    if filter: 
+
+        filter_param = []
+        filter_param_value = []
+        filter_param_metadata_key = []
+        filter_param_metadata_value = []
+        available_filter_options = ["key", "status", "is_favorite", "min_created_at", "max_created_at", "min_expires_at", "max_expires_at", "metadata"]
+
+        #click.echo("Processing filter options...")
+        for param in filter:
+            param_array = param.split("=", param.count(param))
+            
+            #Attributes: key, status, is_favorite, min_created_at, max_created_at, min_expires_at, max_expires_at, metadata")
+            if param_array[0] not in available_filter_options:
+                click.secho("Unknown filter name: "+param_array[0]+"", fg='red', err=True)
+                click.secho("Available filter options: "+str(available_filter_options)+"", fg='blue', err=True)
+                exit(1);
+
+            if len(param_array) == 1:
+                filter_param_value.append("true")
+                filter_param.append(param_array[0])
+            else:
+
+                if param_array[0] == "metadata":
+                    metadata_array = param_array[1].split(":", param_array[1].count(param_array[1]))
+                    filter_param_metadata_key.append(metadata_array[0])
+                    if len(metadata_array) == 1:
+                        filter_param_metadata_value.append("true")
+                    else:
+                        filter_param_metadata_value.append(metadata_array[1])
+                else:
+                    filter_param.append(param_array[0])
+                    filter_param_value.append(param_array[1])
+
+        #click.echo("filter_param: "+str(filter_param))
+        #click.echo("filter_param_value: "+str(filter_param_value))
+        #click.echo("filter_param_metadata_key: "+str(filter_param_metadata_key))
+        #click.echo("filter_param_metadata_value: "+str(filter_param_metadata_value))
+
+        i = 0
+        for param in filter_param:
+            url = url + "&"+param+"="+str(filter_param_value[i])
+            i = i + 1
+
+        i = 0
+        for meta_key in filter_param_metadata_key:
+            url = url + "&metadata["+meta_key+"]="+str(filter_param_metadata_value[i])
+            i = i + 1
 
     r = http_get(url, auth=DidimoAuth(config, api_path))
     json_response = r.json()
@@ -202,15 +251,17 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
               help="Sort by attribute name.")
 @click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
               help="Sorting order of the content. Default is descending.")
+@click.option("-f", "--filter", required=False, show_default=True, multiple=True,
+              help="Filter content by attribute and value. (e.g. -f status=Done -metadata=meta_key:meta_value) Attributes: key, status, is_favorite, min_created_at, max_created_at, min_expires_at, max_expires_at, metadata")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API.")
 @pass_api
-def list(config, page_size, index, navigate, sort_by, sort_order, raw):
+def list(config, page_size, index, navigate, sort_by, sort_order, filter, raw):
     """
     List didimos
     """
     api_path = "/v3/didimos/"
-    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw)
+    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, filter, raw)
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
@@ -224,7 +275,7 @@ def list_demo_didimos(config, number, raw):
     List demo didimos
     """
     api_path = "/v3/didimos/demos"
-    list_aux(config, api_path, 10, number, False, "created_at", "descending", raw)
+    list_aux(config, api_path, 10, number, False, "created_at", "descending", None, raw)
 
 
 @cli.command()
