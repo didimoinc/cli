@@ -169,7 +169,7 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
                     metadata_array = param_array[1].split(":", param_array[1].count(param_array[1]))
                     filter_param_metadata_key.append(metadata_array[0])
                     if len(metadata_array) == 1:
-                        filter_param_metadata_value.append("true")
+                        filter_param_metadata_value.append("*")
                     else:
                         filter_param_metadata_value.append(metadata_array[1])
                 else:
@@ -252,7 +252,7 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
 @click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
               help="Sorting order of the content. Default is descending.")
 @click.option("-f", "--filter", required=False, show_default=True, multiple=True,
-              help="Filter content by attribute and value. (e.g. -f status=Done -metadata=meta_key:meta_value) Attributes: key, status, is_favorite, min_created_at, max_created_at, min_expires_at, max_expires_at, metadata")
+              help="Filter content by attribute and value. (e.g. -f status=Done -f metadata=meta_key:meta_value) Attributes: key, status, is_favorite, min_created_at, max_created_at, min_expires_at, max_expires_at, metadata")
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API.")
 @pass_api
