@@ -750,10 +750,6 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
                   "hair_010", 
                   "hair_011"]),
               help="Create didimo with hair option.")
-@click.option('--profile', multiple=False,
-              help="Create didimo with profile option.")
-@click.option('--shared_resources', multiple=False, is_flag=True,
-              help="Create didimo with shared resources option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -774,7 +770,7 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -819,12 +815,6 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
 
     if hair != None:
         payload["hair"] = hair
-
-    if profile != None:
-        payload["profile"] = profile
-
-    if shared_resources == True:
-        payload["shared_resources"] = "true"
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
