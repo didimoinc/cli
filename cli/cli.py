@@ -576,8 +576,6 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
     else:
         return None
 
-
-
 def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag):
     """
     Shared code that handles polling status and managing download
