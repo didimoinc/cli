@@ -7,6 +7,11 @@ import zipfile
 import os
 import re
 import shutil
+import fnmatch
+import psutil
+import platform
+import multiprocessing
+from multiprocessing import Queue, current_process 
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -112,6 +117,101 @@ def init(config, name, host, api_key, api_secret):
     config.init(name, host, api_key, api_secret)
 
 
+def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw):
+    """
+    List didimos
+    """
+
+    url = config.api_host + api_path
+
+    url = url + "?page="+str(index)
+
+    if page_size != None:
+        url = url + "&page_size="+str(page_size)
+
+    sort_order_api = "-"
+    if sort_order != None:
+        if sort_order == "asc" or sort_order == "ascending":
+            sort_order_api = "+"
+        elif sort_order == "desc" or sort_order == "descending":
+            sort_order_api = "-"
+        else:
+            click.secho("Unknown sort order! Please correct the input. ", fg='red', err=True)
+            exit(1);
+
+    if sort_by != None:
+        url = url + "&order_by="+sort_order_api+sort_by
+
+    r = http_get(url, auth=DidimoAuth(config, api_path))
+    json_response = r.json()
+    #print(str(json_response))
+    is_error = r.json()['is_error'] if 'is_error' in json_response else False
+    if is_error:
+        click.echo("An error has occurred! Aborting...")
+        exit(1);
+
+    if raw:
+        click.echo(r.text)
+    else:
+
+        if index < 1:
+            sys.exit(0)
+
+        didimos = []
+        next_page = json_response['__links']['next'] if '__links' in json_response and 'next' in json_response['__links'] else None
+        page = index
+        didimos += r.json()['didimos']
+
+        while True:
+
+            while page != index:
+
+                if next_page != None:
+                    api_path = next_page
+                    url = api_path
+                    r = http_get(url, auth=DidimoAuth(config, api_path))
+                    json_response = r.json()
+                    didimos += json_response['didimos']
+                    next_page = json_response['__links']['next'] if '__links' in json_response else None
+                    page += 1
+                else:
+                    break
+
+            print_status_header()
+            for didimo in didimos:
+                print_status_row(didimo)
+
+            if navigate and next_page != None:
+                click.confirm('There are more results. Fetch next page?', abort=True)
+                index = index + 1
+                didimos = []
+            else:
+                break
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+#@click.option("-n", "--number", required=False, default=1, show_default=True,
+#              help="Number of pages to query from the API. Each page has 10 didimos.")
+@click.option("-p", "--page-size", required=False, default=20, show_default=True,
+              help="Number of didimos per page to query from the API. Default is 20 didimos.")
+@click.option("-i", "--index", required=False, default=1, show_default=True,
+              help="Page index to query from the API. Default is to show the first page.")
+@click.option("-n", "--navigate", required=False,is_flag=True, default=False, show_default=True,
+              help="Prompt to continue navigating subsequent pages.")
+@click.option("-s", "--sort-by", required=False, default="created_at", show_default=True,
+              help="Sort by attribute name.")
+@click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
+              help="Sorting order of the content. Default is descending.")
+@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+              help="Do not format output, print raw JSON response from API.")
+@pass_api
+def list(config, page_size, index, navigate, sort_by, sort_order, raw):
+    """
+    List didimos
+    """
+    api_path = "/v3/didimos/"
+    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw)
+
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
 @click.option("-n", "--number", required=False, default=1, show_default=True,
@@ -119,39 +219,12 @@ def init(config, name, host, api_key, api_secret):
 @click.option("-r", "--raw", required=False, is_flag=True, default=False,
               help="Do not format output, print raw JSON response from API, ignoring --number.")
 @pass_api
-def list(config, number, raw):
+def list_demo_didimos(config, number, raw):
     """
-    List didimos
+    List demo didimos
     """
-    api_path = "/v3/didimos?order_by=-created_at"
-    url = config.api_host + api_path
-    r = http_get(url, auth=DidimoAuth(config, api_path))
-    if raw:
-        click.echo(r.text)
-    else:
-
-        if number < 1:
-            sys.exit(0)
-
-        didimos = []
-        page = 1
-        didimos += r.json()['didimos']
-
-        while page != number:
-
-            next_page = r.json()['__links']['next']
-            if next_page != None:
-                api_path = next_page
-                url = api_path
-                r = http_get(url, auth=DidimoAuth(config, api_path))
-                didimos += r.json()['didimos']
-                page += 1
-            else:
-                break
-
-        print_status_header()
-        for didimo in didimos:
-            print_status_row(didimo)
+    api_path = "/v3/didimos/demos"
+    list_aux(config, api_path, 10, number, False, "created_at", "descending", raw)
 
 
 @cli.command()
@@ -193,6 +266,62 @@ def account(config, raw):
                 (response["next_expiration_points"],
                 response["next_expiration_date"])
             click.secho(expiry_message, fg="yellow", err=True)
+
+
+#@cli.command(short_help="List available features for creating a didimo")
+#@click.help_option(*HELP_OPTION_NAMES)
+#@pass_api
+def list_features(config):
+    """
+    List available features for creating a didimo
+
+    Use the `new` command to use these accepted values.
+
+    """
+
+    accepted_input_types = []
+    accepted_targets = []
+    featureList = list_features_aux(config)
+
+    click.echo("Accepted features are:")
+    for item in featureList:
+        if "group" in featureList[item]:
+            if featureList[item]["is_input_type"] == True: #(str(featureList[item]["group"])) == "recipe":
+                accepted_input_types.append(featureList[item]["options"])
+            elif str(featureList[item]["group"]) == "targets":
+                accepted_targets.append(featureList[item]["options"])
+            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
+                pass
+            elif str(featureList[item]["group"]) == "input":
+                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
+            elif "tier_level_restriction" in featureList[item] and featureList[item]["tier_level_restriction"] == True: #options - tier_level RESTRICTION 
+                click.echo(" - "+item+" => "+str(featureList[item]["options"])+" - FEATURE OR OPTIONS RESTRICTED BY TIER LEVEL")
+            else:#elif str(featureList[item]["group"]) != "input":
+                click.echo(" - "+item+" => "+str(featureList[item]["options"]))
+
+    click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
+    for item in accepted_input_types:
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
+
+    click.echo("Package type is the type of output of the didimo. Accepted target values are:")
+    for item in accepted_targets:
+        if len(item) > 0:
+            for sub_item in item:
+                click.echo(" - "+str(sub_item))
+        else:
+            click.echo(" - "+str(item))
+
+@cli.command(short_help="Create a didimo")
+@pass_api
+def new(config):
+    """
+    Create a didimo
+    """
+    pass #this is a dummy function just to show up on the main menu
 
 
 
@@ -267,62 +396,6 @@ def list_features_aux(config):
     return output
 
 
-#@cli.command(short_help="List available features for creating a didimo")
-#@click.help_option(*HELP_OPTION_NAMES)
-#@pass_api
-def list_features(config):
-    """
-    List available features for creating a didimo
-
-    Use the `new` command to use these accepted values.
-
-    """
-
-    accepted_input_types = []
-    accepted_targets = []
-    featureList = list_features_aux(config)
-
-    click.echo("Accepted features are:")
-    for item in featureList:
-        if "group" in featureList[item]:
-            if featureList[item]["is_input_type"] == True: #(str(featureList[item]["group"])) == "recipe":
-                accepted_input_types.append(featureList[item]["options"])
-            elif str(featureList[item]["group"]) == "targets":
-                accepted_targets.append(featureList[item]["options"])
-            elif item == "photo": #HACK: will be removed when the ui provides enough info to ignore this input type as feature
-                pass
-            elif str(featureList[item]["group"]) == "input":
-                click.echo(" - "+item+" => "+"the path to the depth file (which must be a .jpg/.jpeg/.png).")   
-            elif "tier_level_restriction" in featureList[item] and featureList[item]["tier_level_restriction"] == True: #options - tier_level RESTRICTION 
-                click.echo(" - "+item+" => "+str(featureList[item]["options"])+" - FEATURE OR OPTIONS RESTRICTED BY TIER LEVEL")
-            else:#elif str(featureList[item]["group"]) != "input":
-                click.echo(" - "+item+" => "+str(featureList[item]["options"]))
-
-    click.echo("TYPE is the type of input used to create the didimo. Accepted type values are:")
-    for item in accepted_input_types:
-        if len(item) > 0:
-            for sub_item in item:
-                click.echo(" - "+str(sub_item))
-        else:
-            click.echo(" - "+str(item))
-
-    click.echo("Package type is the type of output of the didimo. Accepted target values are:")
-    for item in accepted_targets:
-        if len(item) > 0:
-            for sub_item in item:
-                click.echo(" - "+str(sub_item))
-        else:
-            click.echo(" - "+str(item))
-
-@cli.command(short_help="Create a didimo")
-@pass_api
-def new(config):
-    """
-    Create a didimo
-    """
-    pass #this is a dummy function just to show up on the main menu
-
-
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
@@ -371,7 +444,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file. It can also be a zip file or a folder containing multiple photos (all files will be treated as input photos).
 
     \b
     Examples:
@@ -379,6 +452,8 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
         $ didimo new photo /path/input.jpg
 
     """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -405,8 +480,11 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
     if not ignore_cost:   
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-       
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        if batch_files != None:
+            #print(batch_files[0])
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
         
         json_response = r.json()
         is_error = r.json()['is_error'] if 'is_error' in json_response else False
@@ -415,39 +493,217 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+    batch_flag = True
+    if batch_files == None:
+        batch_files = [input]
+        batch_flag = False
 
-    didimo_id = r.json()['key']
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
 
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
+
+def new_aux_shared_preprocess_batch_files(input, input_type):
+    """
+    Shared code that handles preprocessing batch files (zip or directory) from the provided input
+    """
+    batch_flag = False
+    batch_processing_path = None
+    batch_total_files = 0
+    temp_batch_files = None
+    batch_files = []
+
+    
+
+    #if (input end with zip or /):
+    if input.endswith('.zip') or os.path.isdir(input):
+        if input_type != "photo":
+            click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
+            return None
+        #if ignore_cost != True:
+        #    echo("Batch processing does not support didimo cost verification. Please use the --ignore-cost option and try again.")
+        #    return
+        else:
+            batch_flag = True
+            separator = "/"
+            if platform.system() == "Windows":
+                separator = "\\"
+            #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
+            if input.endswith('.zip'):
+                temp_directory_to_extract_to = "temp"
+                path_prefix = temp_directory_to_extract_to
+  
+                directory = os.getcwd()
+                if not directory.endswith(separator):
+                    directory = directory + separator
+                batch_processing_path = directory+temp_directory_to_extract_to 
+                shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
+                with zipfile.ZipFile(input, 'r') as zip_ref:
+                    zip_ref.extractall(temp_directory_to_extract_to)
+                    zip_ref.close()
+            elif os.path.isdir(input):
+                batch_processing_path = input
+                path_prefix = input
             else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
+                click.echo("file not supported")
+                return None
+            temp_batch_files=os.listdir(batch_processing_path)
+            #batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            #click.echo("Batch processing - path: " + batch_processing_path)
+            #click.echo("Batch processing - files count: " + str(batch_total_files))
+
+            if not path_prefix.endswith(separator):
+                path_prefix = path_prefix + separator
+            for idx, input_file in enumerate(temp_batch_files):
+                #print(input_file)
+                if input_file != ".DS_Store" and not os.path.isdir(path_prefix + input_file):
+                    batch_files.append(path_prefix + input_file)
+                    print(path_prefix + input_file)
+
+            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
+            click.echo("Batch processing - files count: " + str(batch_total_files))
+
+            return batch_files
+    else:
+        return None
+
+def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag):
+    """
+    Shared code that handles polling status and managing download
+    """
+    
+    batch_didimo_ids = []
+    #click.echo("Uploading files...")
+    with click.progressbar(length=len(batch_files), label='Uploading files...', show_eta=False) as bar:
+                    last_value = 0
+                    i = 0
+                    
+                    for input_file in batch_files:
+                        r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
+
+                        if r.status_code != 200 and r.status_code != 201:
+                            click.secho('\nError %d uploading %s: %s' % (r.status_code, input_file, r.text), err=True, fg='red')
+                            didimo_id = None
+                        else:
+                            didimo_id = r.json()['key']
+
+                        batch_didimo_ids.append(didimo_id)
+                        i = i + 1
+
+                        update = i - last_value
+                        last_value = i
+                        bar.update(update)
+
+                        #click.echo(""+str(i)+"/"+str(len(batch_files)))
+
+    click.echo("Checking progress...")
+    complete_tasks = Queue()
+    jobs = []
+    i = 0
+    for input_file in batch_files:
+
+        if not no_wait:
+
+            didimo_id = batch_didimo_ids[i]
+            i = i + 1
+
+            if didimo_id == None:
+                continue
+            #click.echo(didimo_id)
+
+            if batch_flag: #fork and don't output progress bars
+
+                no_error = None
+                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
+                    last_value = 0
+                    initing_progress_bar = True
+                    while True:
+                        if not initing_progress_bar:
+                            response = get_didimo_status(config, didimo_id)
+                            #click.echo(response)
+                            #click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
+                            percent = response.get('percent', 100)
+                            update = percent - last_value
+                            last_value = percent
+                            bar.update(update)
+                            if response['status_message'] != "":
+                                no_error = False
+                                click.secho(err=True)
+                                click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
+                                break
+                            if response['status'] == 'done':
+                                no_error = True
+                                break
+                        else:
+                            bar.update(0)
+                            initing_progress_bar = False
+                        time.sleep(2)
+                        
+                if not no_download and no_error == True:
+
+                    #click.echo("Downloading didimo "+didimo_id+"...")
+
+                    if output is None:
+                        output = ""
+                    elif output != "":
+                        if not output.endswith('/'):
+                            output = output + "/"
+
+                    while True:
+                        active_child_count = len(jobs)-complete_tasks.qsize()
+                        if active_child_count < 5:
+                            p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
+                            jobs.append(p)
+                            p.start()
+                            break
+                        else:
+                            #click.echo("Waiting to download | Jobs:"+str(len(jobs))+" | Active processes:"+str(active_child_count)+" | Completed:"+str(complete_tasks.qsize()))
+                            time.sleep(1)
+                    
+            else:
+                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
+                    last_value = 0
+                    while True:
+                        response = get_didimo_status(config, didimo_id)
+                        percent = response.get('percent', 100)
+                        update = percent - last_value
+                        last_value = percent
+                        bar.update(update)
+                        if response['status_message'] != "":
+                            click.secho(err=True)
+                            click.secho('Error: %s' %
+                                        response["status_message"], err=True, fg='red')
+                            sys.exit(1)
+                        if response['status'] == 'done':
+                            break
+                        time.sleep(2)
+                if not no_download:
+                    if output is None:
+                        output = ""
+                    else:
+                        if not output.endswith('/'):
+                            output = output + "/"
+                    download_didimo(config, didimo_id, "", output)
+
+    #check if child processes are still running and wait for them to finish
+    if batch_flag:
+        click.echo("Please wait while the remaining files are finished downloading...")
+        for job in jobs:
+            job.join()
+    click.echo("All done!")
+
+def download_didimo_subprocess(config, didimo_id, package_type, output, showProgressBar, complete_tasks):
+    download_didimo(config, didimo_id, package_type, output, showProgressBar)
+    complete_tasks.put(didimo_id + ' is done by ' + current_process().name)
 
 
 @cli.command(short_help="Create a didimo")
@@ -471,18 +727,27 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
               help="Create didimo with avatar structure option.")
 @click.option('--garment', multiple=False,
               type=click.Choice(
-                  ["none","casual", "sporty"]),
+                  ["none","casual", "sporty", "business"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
-@click.option('--include_default_hair_hat', multiple=False, is_flag=True,
-              help="Create didimo with default hair and cap option.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
-                  ["female", "male", "none"]),
+                  ["female", "male", "auto"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
-@click.option('--profile', multiple=False,
-              help="Create didimo with profile option.")
-@click.option('--shared_resources', multiple=False, is_flag=True,
-              help="Create didimo with shared resources option.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "hair_001",  
+                  "hair_002", 
+                  "hair_003", 
+                  "hair_004", 
+                  "hair_005", 
+                  "hair_006", 
+                  "hair_007", 
+                  "hair_008", 
+                  "hair_009", 
+                  "hair_010", 
+                  "hair_011"]),
+              help="Create didimo with hair option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -503,7 +768,7 @@ def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, 
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, include_default_hair_hat, gender, profile, shared_resources, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -516,7 +781,7 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         For more information on the input types, visit
         https://developer.didimo.co/docs/cli\b
 
-    INPUT is the path to the input file.
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos)
 
     \b
     Examples:
@@ -524,6 +789,8 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         $ didimo new photo /path/input.jpg
 
     """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -542,20 +809,10 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         payload["garment"] = garment
 
     if gender != None:
-        if gender == "none":
-            payload["gender"] = ""
-        else:
-            payload["gender"] = gender
+        payload["gender"] = gender
 
-    if profile != None:
-        payload["profile"] = profile
-
-    if shared_resources == True:
-        payload["shared_resources"] = "true"
-            
-    if include_default_hair_hat == True:
-        payload["include_default_hair_hat"] = "true"
-
+    if hair != None:
+        payload["hair"] = hair
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
@@ -572,7 +829,11 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+
         json_response = r.json()
         is_error = r.json()['is_error'] if 'is_error' in json_response else False
         if is_error:
@@ -580,39 +841,23 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+    batch_flag = True
+    if batch_files == None:
+        batch_files = [input]
+        batch_flag = False
 
-    didimo_id = r.json()['key']
-
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
-            else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
 
 
 @cli.command(short_help="Create a didimo")
@@ -653,7 +898,7 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
 
     TYPE is the type of input used to create the didimo. 
 
-    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png).
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos).
 
     \b
     Use `didimo list-features` to see the accepted values.
@@ -681,6 +926,8 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
             $ didimo new photo -f max_texture_dimension=2048 /path/input.jpg
 
     """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
 
     click.echo("")
     click.echo("Obtaining params list...")
@@ -780,7 +1027,11 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
-        r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth, False)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+
         is_error = ('status' in r.json() and r.json()['status'] != 201) or ('is_error' in r.json() and r.json()['is_error'])
         if is_error:
             click.echo("ERROR: "+ str(r.json()))
@@ -788,40 +1039,24 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
             exit(1);
 
         estimated_cost = r.json()['cost']
-        click.echo("The cost of this operation is: "+str(estimated_cost))
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
         click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
         click.echo("Proceeding...")
 
+    batch_flag = True
+    if batch_files == None:
+        batch_files = [input]
+        batch_flag = False
 
-    r = http_post_withphoto(url, config.access_key, payload, input, depth)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
 
-    didimo_id = r.json()['key']
-
-    click.echo(didimo_id)
-    if not no_wait:
-        with click.progressbar(length=100, label='Creating didimo', show_eta=False) as bar:
-            last_value = 0
-            while True:
-                response = get_didimo_status(config, didimo_id)
-                percent = response.get('percent', 100)
-                update = percent - last_value
-                last_value = percent
-                bar.update(update)
-                if response['status_message'] != "":
-                    click.secho(err=True)
-                    click.secho('Error: %s' %
-                                response["status_message"], err=True, fg='red')
-                    sys.exit(1)
-                if response['status'] == 'done':
-                    break
-                time.sleep(2)
-        if not no_download:
-            if output is None:
-                output = ""
-            else:
-                if not output.endswith('/'):
-                    output = output + "/"
-            download_didimo(config, didimo_id, "", output)
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
@@ -1187,8 +1422,6 @@ def get_cli_version_compatibility_rules(config):
         sys.exit(1)
 
     response = r.json()
-
-    #print(response)
 
     for version in response["versions"]:
         if version["code"] == __version__:

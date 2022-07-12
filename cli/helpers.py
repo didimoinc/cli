@@ -93,7 +93,7 @@ def wait_for_dgp_completion_aux(config, key, return_dict):
     return_dict[0] = 3
     return
 
-def download_didimo(config, id, package_type, output_path):
+def download_didimo(config, id, package_type, output_path, showProgressBar=True):
     api_path = "/v3/didimos/" + id
     url = config.api_host + api_path
     r = http_get(url, auth=DidimoAuth(config, api_path))
@@ -111,17 +111,27 @@ def download_didimo(config, id, package_type, output_path):
                 s3url = package_itm["__links"]["self"]
 
         if s3url != "":
-            print ("downloading....")
-            with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
-                r.raise_for_status()
-                zipsize = int(r.headers.get('content-length', 0))
-                with click.open_file(output_path_full, 'wb') as f:
-                    label = "Downloading %s" % id
-                    with click.progressbar(length=zipsize, label=label) as bar:
-                        for chunk in r.iter_content(chunk_size=2048):
-                            size = f.write(chunk)
-                            bar.update(size)
-            click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
+            #print ("downloading.... "+s3url)
+            try: 
+                with http_get(s3url, auth=DidimoAuth(config, api_path)) as r:
+                    r.raise_for_status()
+                    zipsize = int(r.headers.get('content-length', 0))
+                    with click.open_file(output_path_full, 'wb') as f:
+                        if showProgressBar:
+                            label = "Downloading %s" % id
+                            with click.progressbar(length=zipsize, label=label) as bar:
+                                for chunk in r.iter_content(chunk_size=2048):
+                                    size = f.write(chunk)
+                                    bar.update(size)
+                        else:
+                            for chunk in r.iter_content(chunk_size=zipsize):
+                                size = f.write(chunk)
+                if showProgressBar:
+                    click.secho('Downloaded to %s' % output_filename, fg='blue', err=True)
+            except Exception as error: 
+                click.secho('Error downloading to %s: %s' % (output_filename, error), fg='red', err=True)
+                #pass
+            
 
         # else:
             # print ("Unable to download")
