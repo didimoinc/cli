@@ -11,7 +11,7 @@ import fnmatch
 import psutil
 import platform
 import multiprocessing
-from multiprocessing import Queue, current_process 
+from multiprocessing import current_process 
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
@@ -606,7 +606,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         #click.echo(""+str(i)+"/"+str(len(batch_files)))
 
     click.echo("Checking progress...")
-    complete_tasks = Queue()
+    complete_tasks = []
     jobs = []
     i = 0
     for input_file in batch_files:
@@ -659,7 +659,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
 
                     while True:
-                        active_child_count = len(jobs)-complete_tasks.qsize()
+                        active_child_count = len(jobs)-len(complete_tasks)
                         if active_child_count < 5:
                             p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
                             jobs.append(p)
@@ -703,7 +703,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
 def download_didimo_subprocess(config, didimo_id, package_type, output, showProgressBar, complete_tasks):
     download_didimo(config, didimo_id, package_type, output, showProgressBar)
-    complete_tasks.put(didimo_id + ' is done by ' + current_process().name)
+    complete_tasks.append(didimo_id + ' is done by ' + current_process().name)
 
 
 @cli.command(short_help="Create a didimo")
