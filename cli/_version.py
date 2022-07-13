@@ -1,1 +1,1 @@
-__version__='2.1.1' #"dev" #this is the cli version
+__version__='2.4.1' #"dev" #this is the cli version
