@@ -1,8 +1,11 @@
 stages:
   - build & deploy
+  - sync github
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
+  GITHUB_USER_NAME: $GITHUB_USER_NAME 
+  SYNC_JOB_TOKEN: $SYNC_JOB_TOKEN 
 
 .build-template:
   stage: build & deploy
@@ -35,3 +38,35 @@ Build Staging Docker Image:
       when: manual
   variables:
     DOCKER_TAG: ${CI_COMMIT_SHORT_SHA}
+
+
+Sync github:
+  stage: sync github
+  image:
+    name: alpine/git:latest
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"' && "$CI_COMMIT_TAG"
+      when: manual
+  script:
+    - echo "-- Sync github --"
+    - echo "gitlab user.email=$GITLAB_USER_EMAIL"
+    - echo "gitlab user.name=$GITLAB_USER_NAME"
+    - echo "github user.name=$GITHUB_USER_NAME"
+    - echo "github token=$SYNC_JOB_TOKEN"
+    - rm -rf sharedrepo
+    #- git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@git.didimo.co/eva.almeida/ini2170-shared-resources.git sharedrepo
+    - git clone https://${$GITHUB_USER_NAME}:${SYNC_JOB_TOKEN}@github.com/didimoinc/cli.git sharedrepo
+    - mkdir -p sharedrepo/shared/$CI_COMMIT_TAG
+#    - rm -R sharedrepo/shared/$CI_COMMIT_TAG/private_folder. #PREVENT PRIVATE FOLDER FROM BEING COMMITED
+    - rm -f sharedrepo/shared/$CI_COMMIT_TAG/.gitlab-ci.yml.  #PREVENT CERTAIN FILES FROM BEING COMMITED
+    - cd sharedrepo
+    #- git config --global user.email "$GITLAB_USER_EMAIL"
+    #- git config --global user.name "$GITLAB_USER_NAME"
+    - git add shared/$CI_COMMIT_TAG/*
+    - git commit -m "added shared res for $CI_COMMIT_TAG"
+    - git tag $CI_COMMIT_TAG -m $CI_COMMIT_TAG
+    - git push --tags
+    - echo "-- Sync complete --"
+
+
