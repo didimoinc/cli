@@ -8,5 +8,5 @@ RUN echo "__version__ = \"${CLI_VERSION}\"" > cli/_version.py \
 FROM python:3-alpine
 WORKDIR /app
 COPY --from=builder /app/dist/ /app/
-RUN pip3 install didimo_cli*.whl && rm didimo_cli*.whl
+RUN apk add build-base  && apk add libc-dev && apk add linux-headers && pip3 install didimo_cli*.whl && rm didimo_cli*.whl
 ENTRYPOINT ["/usr/local/bin/didimo"]

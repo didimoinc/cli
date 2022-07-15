@@ -12,12 +12,15 @@ import psutil
 import platform
 import multiprocessing
 from multiprocessing import current_process 
+from multiprocessing import Process
+from .shared_queue import MyQueue, SharedCounter
 
 from .utils import print_key_value, print_status_header, print_status_row
 from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
 from .config import Config
 from .helpers import get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
 from ._version import __version__
+
 
 pass_api = click.make_pass_decorator(Config)
 
@@ -606,7 +609,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                         #click.echo(""+str(i)+"/"+str(len(batch_files)))
 
     click.echo("Checking progress...")
-    complete_tasks = []
+    complete_tasks = MyQueue()
     jobs = []
     i = 0
     for input_file in batch_files:
@@ -659,7 +662,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
                             output = output + "/"
 
                     while True:
-                        active_child_count = len(jobs)-len(complete_tasks)
+                        active_child_count = len(jobs)-complete_tasks.qsize()
                         if active_child_count < 5:
                             p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
                             jobs.append(p)
@@ -703,7 +706,7 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
 def download_didimo_subprocess(config, didimo_id, package_type, output, showProgressBar, complete_tasks):
     download_didimo(config, didimo_id, package_type, output, showProgressBar)
-    complete_tasks.append(didimo_id + ' is done by ' + current_process().name)
+    complete_tasks.put(didimo_id + ' is done by ' + current_process().name)
 
 
 @cli.command(short_help="Create a didimo")
