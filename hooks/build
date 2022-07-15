@@ -1,2 +1,0 @@
-#!/bin/bash
-docker build --pull --build-arg CLI_VERSION="$SOURCE_BRANCH" -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" .
