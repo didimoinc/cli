@@ -16,7 +16,7 @@ from multiprocessing import Process
 from .shared_queue import MyQueue, SharedCounter
 
 from .utils import print_key_value, print_status_header, print_status_row
-from .network import DidimoAuth, http_get, http_post, http_post_withphoto, cache_this_call, clear_network_cache
+from .network import DidimoAuth, http_get, http_post, http_post_withphoto, http_post_no_break, http_put, http_delete, cache_this_call, clear_network_cache
 from .config import Config
 from .helpers import get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
 from ._version import __version__
@@ -429,8 +429,8 @@ def list_features_aux(config):
               default=False,
               help="Do not prompt user to confirm operation cost.")
 @click.option("--version", "-v",
-              type=click.Choice(["2.5"]),
-              default="2.5",
+              type=click.Choice(["2.5.2"]),
+              default="2.5.2",
               help="Version of the didimo.", show_default=True)
 @pass_api
 #def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
@@ -524,8 +524,6 @@ def new_aux_shared_preprocess_batch_files(input, input_type):
     batch_total_files = 0
     temp_batch_files = None
     batch_files = []
-
-    
 
     #if (input end with zip or /):
     if input.endswith('.zip') or os.path.isdir(input):
@@ -621,7 +619,6 @@ def new_aux_shared_upload_processing_and_download(config, url, batch_files, dept
 
             if didimo_id == None:
                 continue
-            #click.echo(didimo_id)
 
             if batch_flag: #fork and don't output progress bars
 
@@ -730,27 +727,12 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               help="Create didimo with avatar structure option.")
 @click.option('--garment', multiple=False,
               type=click.Choice(
-                  ["none","casual", "sporty", "business"]),
+                  ["none","casual", "sporty"]),
               help="Create didimo with garment option. This option is only available for full-body didimos.")
 @click.option('--gender', multiple=False,
               type=click.Choice(
                   ["female", "male", "auto"]),
               help="Create didimo with gender option. This option is only available for full-body didimos.")
-@click.option('--hair', multiple=False,
-              type=click.Choice(
-                  ["baseball_cap", 
-                  "hair_001",  
-                  "hair_002", 
-                  "hair_003", 
-                  "hair_004", 
-                  "hair_005", 
-                  "hair_006", 
-                  "hair_007", 
-                  "hair_008", 
-                  "hair_009", 
-                  "hair_010", 
-                  "hair_011"]),
-              help="Create didimo with hair option.")
 @click.option('--no-download', '-n', is_flag=True, default=False,
               help="Do not download didimo.")
 @click.option('--no-wait', '-w', is_flag=True, default=False,
@@ -766,12 +748,11 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
               default=False,
               help="Do not prompt user to confirm operation cost.")
 @click.option("--version", "-v",
-              type=click.Choice(["2.5"]),
-              default="2.5",
+              type=click.Choice(["2.5.7"]),
+              default="2.5.7",
               help="Version of the didimo.", show_default=True)
 @pass_api
-#def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
     """
     Create a didimo
 
@@ -813,9 +794,6 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
 
     if gender != None:
         payload["gender"] = gender
-
-    if hair != None:
-        payload["hair"] = hair
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
@@ -861,6 +839,169 @@ def new_2_5_6(config, input_type, input, depth, feature, avatar_structure, garme
         batch_flag = False
 
     new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+
+
+@cli.command(short_help="Create a didimo")
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.argument("input", type=click.Path(exists=True), required=True)
+@click.option('--depth', '-d',
+              type=click.Path(), required=False,
+              help="Create didimo with depth.")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty", "business"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "hair_001",  
+                  "hair_002", 
+                  "hair_003", 
+                  "hair_004", 
+                  "hair_005", 
+                  "hair_006", 
+                  "hair_007", 
+                  "hair_008", 
+                  "hair_009", 
+                  "hair_010", 
+                  "hair_011"]),
+              help="Create didimo with hair option.")
+@click.option('--body-pose', '-bp',
+              type=click.Choice(["A", "T"]),
+              help="Specify body pose for this didimo. This option is only available for full-body didimos.", show_default=False)
+@click.option('--profile', default="standard",
+              type=click.Choice(["standard", "optimized"]),
+              help="Specify a profile to drive this didimo generation.", show_default=False)
+@click.option('--no-download', '-n', is_flag=True, default=False,
+              help="Do not download didimo.")
+@click.option('--no-wait', '-w', is_flag=True, default=False,
+              help="Do not wait for didimo creation and do not download.")
+@click.option("--output", "-o", type=click.Path(), required=False,
+              help="Path to download the didimo. If multiple package types "
+              "are present or if the flags --no-wait or --no-download "
+              "are present, this option is ignored. [default: <ID>.zip]")
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost.")
+@click.option("--version", "-v",
+              type=click.Choice(["2.5.10"]),
+              default="2.5.10",
+              help="Version of the didimo.", show_default=True)
+@pass_api
+def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, body_pose, profile, no_download, no_wait, output, package_type, ignore_cost, version):
+    """
+    Create a didimo
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+
+    INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos)
+
+    \b
+    Examples:
+        Create a didimo from a photo
+        $ didimo new photo /path/input.jpg
+
+    """
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
+
+    api_path = "/v3/didimos"
+    url = config.api_host + api_path
+
+    payload = {
+#        'input_type': 'photo'
+    }
+
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if avatar_structure != None:
+        payload["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        payload["garment"] = garment
+
+    if gender != None:
+        payload["gender"] = gender
+
+    if hair != None:
+        payload["hair"] = hair
+
+    if body_pose != None:
+        if avatar_structure == "full-body":
+            payload["body_pose"] = body_pose
+        else:
+            click.echo("The body pose feature is only available for full body didimos.", err=True)
+            exit(1);
+    
+    if profile != None:
+        payload["profile"] = profile
+
+    if len(package_type) > 0:
+        payload["transfer_formats"] = package_type
+        package_type = package_type[0]
+    else:
+        package_type = "gltf"
+
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+
+    if not ignore_cost:    
+        # check how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the didimo generation request
+        if batch_files != None:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
+        else:
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
+
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+
+        if batch_files != None:
+            total_estimated_cost = estimated_cost * len(batch_files)
+            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
+        else:
+            click.echo("The cost of this operation is: "+str(estimated_cost))
+        
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
+
+    batch_flag = True
+    if batch_files == None:
+        batch_files = [input]
+        batch_flag = False
+
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+
 
 
 @cli.command(short_help="Create a didimo")
@@ -1121,6 +1262,83 @@ def status(config, id, raw, silent):
         print_status_header()
         for didimo in didimos:
             print_status_row(didimo)
+
+
+@cli.command(short_help='Get details of didimos')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True, nargs=-1)
+@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+              help="Do not format output, print raw JSON response from API.")
+@pass_api
+def inspect(config, id, raw):
+    """
+    Get details of didimos
+
+    <ID> is the didimo ID to get information.
+
+    Multiple didimo IDs are accepted, separated by a space or newline
+
+    If <ID> is the character "-", read the IDs from STDIN.
+
+    """
+    didimos = []
+
+    ids = set(id)
+
+    # read didimo ids if used with a pipe
+    if "-" in ids:
+        ids = sys.stdin.readlines()
+
+    for didimo in ids:
+
+        response = get_didimo_status(config, didimo.rstrip())
+
+
+
+        # TODO
+        # Remove this block when /status endpoint is consistent with /list
+        if response['status_message'] != "":
+            response["key"] = didimo.rstrip()
+            response["status"] = "error"
+
+        didimos.append(response)
+
+    if raw:
+        click.echo(json.dumps(didimos, indent=4))
+    else:
+        for didimo in didimos:
+            click.secho("-- didimo "+response["key"]+" --", fg="green", err=True)
+            print_key_value("Key", response["key"])
+            print_key_value("Input type", response["input_type"])
+            
+            print_key_value("Cost", response["cost"])
+            print_key_value("Created at", response["created_at"])
+            print_key_value("Expires at", response["expires_at"])
+            print_key_value("Status", response["status"])
+            if response['status'] == "processing" or response['status'] == "error":
+                print_key_value("Percent", response["percent"])
+            if response['status_message'] != "":
+                print_key_value("Status message", response["status_message"])
+            print_key_value("Is favorite", response["is_favorite"])
+
+            if "transfer_formats" in response:
+                transfer_formats = []
+                for trf in response["transfer_formats"]:
+                    transfer_formats.append(trf["name"])
+                print_key_value("Transfer formats", str(transfer_formats))
+
+            if "meta_data" in response:
+                click.secho("-- System Metadata --", fg="yellow", err=True)
+                for meta_data in response["meta_data"]:
+                    if meta_data["definer"] == "system":
+                        print_key_value(meta_data["name"], meta_data["value"])
+                click.secho("-- User-defined Metadata --", fg="blue", err=True)
+                for meta_data in response["meta_data"]:
+                    if meta_data["definer"] == "user":
+                        print_key_value(meta_data["name"], meta_data["value"])
+            click.secho("--------------------------------", fg="green", err=True)
+
+
 
 
 @cli.command(short_help="Get or set configuration")
@@ -1386,6 +1604,162 @@ def vertexdeform(config, vertex, user_asset, timeout):
         click.echo("There was an error creating package file. Download aborted.")
     else:
         download_asset(config, url, api_path, output)
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@pass_api
+def delete(config, id):
+    """
+    Delete a didimo
+
+    <id> is the didimo key
+
+    """
+    #
+
+    api_path = "/v3/didimos/"
+    url = config.api_host + api_path + id
+
+    r = http_delete(url, auth=DidimoAuth(config, api_path))
+
+    if r.status_code != 204:
+        if r.status_code == 404:
+            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+        sys.exit(1)
+
+    click.secho('Deleted!', err=False, fg='blue')
+
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@click.argument("name", required=True)
+@click.argument("value", required=True)
+@pass_api
+def set_metadata(config, id, name, value):
+    """
+    Sets metadata on a didimo
+
+    <id> is the didimo key
+    <name> is the metadata key
+    <value> is the metadata value
+
+    """
+    api_path = "/v3/didimos/"+id+"/meta_data"
+    url = config.api_host + api_path
+
+    payload = {'name': name, 'value': value}
+    
+    r = http_post_no_break(url, auth=DidimoAuth(config, api_path), json=payload) 
+
+    if r.status_code != 201:
+        if r.status_code == 404:
+            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+        elif r.status_code == 400:
+            click.secho('Please correct your input.', err=True, fg='red')
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+        sys.exit(1)
+    click.secho('Metadata - Name: '+name+' Value: '+str(value), err=False, fg='blue')
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@click.argument("name", required=True)
+@pass_api
+def get_metadata(config, id, name):
+    """
+    Retrieves metadata on a didimo
+
+    <id> is the didimo key
+    <name> is the metadata key
+
+    """
+    api_path = "/v3/didimos/"+id+"/meta_data/"+name
+    url = config.api_host + api_path
+
+    
+    r = http_get(url, auth=DidimoAuth(config, api_path)) 
+
+    if r.status_code != 200:
+        if r.status_code == 404:
+            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+        elif r.status_code == 400:
+            click.secho('Please correct your input.', err=True, fg='red')
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+        sys.exit(1)
+
+    response = r.json()
+    click.secho('Metadata - Name: '+name+' Value: '+str(response['value']), err=False, fg='blue')
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@click.argument("name", required=True)
+@click.argument("value", required=True)
+@pass_api
+def update_metadata(config, id, name, value):
+    """
+    Updates metadata on a didimo
+
+    <id> is the didimo key
+    <name> is the metadata key
+    <value> is the new metadata value
+
+    """
+    api_path = "/v3/didimos/"+id+"/meta_data/"+name
+    url = config.api_host + api_path
+
+    payload = {'name': name, 'value': value}
+    
+    r = http_put(url, auth=DidimoAuth(config, api_path), json=payload) 
+
+    if r.status_code != 200:
+        if r.status_code == 404:
+            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+        elif r.status_code == 403:
+            click.secho('The didimo\'s metadata item cannot be updated because it is not user-defined.', err=True, fg='red')
+        elif r.status_code == 400:
+            click.secho('Please correct your input.', err=True, fg='red')
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+        sys.exit(1)
+    click.secho('Updated!', err=False, fg='blue')
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@click.argument("name", required=True)
+@pass_api
+def delete_metadata(config, id, name):
+    """
+    Deletes metadata on a didimo
+
+    <id> is the didimo key
+    <name> is the metadata key
+
+    """
+    api_path = "/v3/didimos/"+id+"/meta_data/"+name
+    url = config.api_host + api_path
+    
+    r = http_delete(url, auth=DidimoAuth(config, api_path)) 
+
+    if r.status_code != 204:
+        if r.status_code == 404:
+            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+        elif r.status_code == 403:
+            click.secho('The didimo\'s metadata item cannot be deleted because it is not user-defined.', err=True, fg='red')
+        elif r.status_code == 400:
+            click.secho('Please correct your input.', err=True, fg='red')
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+        sys.exit(1)
+    click.secho('Deleted!', err=False, fg='blue')
+
 
 def get_api_version(config):
     # Get the current DGP version from the applications using the selected API Key

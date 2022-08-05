@@ -43,6 +43,29 @@ def http_get(url, **kwargs):
         click.echo("A Network Error Has Occured")
         sys.exit(1)
 
+def http_delete(url, **kwargs):
+    try:
+        r = requests.delete(url, **kwargs)
+        if r.status_code == 204:
+            return r
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo(r.text)
+            #sys.exit(1)
+            return r
+    except:
+        click.echo("A Network Error Has Occured")
+        sys.exit(1)
+
+def http_put(url, **kwargs):
+    r = requests.put(url, **kwargs)
+    if r.status_code == 200:
+        return r
+    else:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        return r
+
 def http_post(url, **kwargs):
     r = requests.post(url, **kwargs)
     if r.status_code == 200:
@@ -51,6 +74,15 @@ def http_post(url, **kwargs):
         click.secho('Error %d' % r.status_code, err=True, fg='red')
         click.echo(r.text)
         sys.exit(1)
+
+def http_post_no_break(url, **kwargs): 
+    r = requests.post(url, **kwargs)
+    if r.status_code == 200 or r.status_code == 201:
+        return r
+    else:
+        click.secho('Error %d' % r.status_code, err=True, fg='red')
+        click.echo(r.text)
+        return r
 
 def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code = True):
 
