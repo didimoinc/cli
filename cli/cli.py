@@ -1339,8 +1339,6 @@ def inspect(config, id, raw):
             click.secho("--------------------------------", fg="green", err=True)
 
 
-
-
 @cli.command(short_help="Get or set configuration")
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("name", required=False)
