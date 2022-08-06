@@ -20,16 +20,21 @@ Commands:
   account                           Get account information
   clear-cache                       Clears cache and exit
   config                            Get or set configuration
+  delete                            Delete a didimo
+  delete-metadata                   Deletes metadata on a didimo
   download                          Download a didimo
   execute                           Execute on-demand features on didimos
+  get-metadata                      Retrieves metadata on a didimo
   init                              Initializes configuration
+  inspect                           Get details of didimos
   list                              List didimos
   list-demo-didimos                 List demo didimos
-  vertexdeform                      Deform a model
   new                               Create a didimo
+  set-metadata                      Sets metadata on a didimo
   status                            Get status of didimos
-  version                           Print version and exit
-  version-api                       Print api dgp version and exit
+  update-metadata                   Updates metadata on a didimo
+  version                           Print CLI version and exit
+  version-api                       Print API/DGP version and exit
   version-cli-compatibility-rules   Print cli compatibility rules and exit
 ```
 
@@ -88,6 +93,11 @@ file.
 
 Generating a didimo may include several options, as described on our developer portal.
 
+The tool allows the selection of the avatar structure (--avatar-structure), for which it currently accepts full-body or head-only (default) options. For full-body requests, some extra parameters are available:
+- the definition of the body pose (--body-pose);
+- the definition of the garments (--garment);
+- the definition of a gender (--gender).
+
 Didimo CLI currently accepts the following features (-f):
 - oculus_lipsync
 - simple_poses
@@ -98,11 +108,9 @@ The CLI accepts following output formats (-p):
 - glTF
 - FBX
 
-In addition to those, it also accepts the definition of other parameters:
-- the maximum texture dimension (-m)
-- the avatar structure, which controls the output as a full-body or a head-only didimo (--avatar_structure)
-- the garments that must be applied to a full-body didimo (--garment)
-- the selected body gender for the didimo (--gender)
+In addition to those, it also accepts:
+- the definition of a profile (--profile), which will drive the output texture files dimensions and formats;
+- the definition of a default hair or baseball cap, from our collection of hairstyles (--hair).
 
 Input type accepts:
 - photo
