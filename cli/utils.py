@@ -50,4 +50,3 @@ def print_status_row(didimo):
                     didimo['status'].title(),
                     didimo['created_at']),
                 fg=color)
-
