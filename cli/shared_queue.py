@@ -90,3 +90,18 @@ class MyQueue(Queue):
     def empty(self):
         """ Reliable implementation of multiprocessing.Queue.empty() """
         return not self.qsize()
+
+    def as_array(self):
+        result = []
+        iterable = iter(self.get, None)
+        n_items = self.size.value
+        n_curr = 0
+        if n_curr < n_items:
+            n_curr = n_curr + 1
+            for item in iterable: 
+                #print(str(item))
+                result.append(item)
+                if n_curr == n_items:
+                    break
+                n_curr = n_curr + 1
+        return result

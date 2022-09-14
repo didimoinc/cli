@@ -12,8 +12,9 @@ class Config(object):
         self.secret_key = ""
         self.configuration = ""
         self.api_host = ""
+        self.output_display_type = ""
 
-    def init(self, configuration, host, api_key, api_secret):
+    def init(self, configuration, host, api_key, api_secret, output_display_type):
         config_dir = Path.home() / ".didimo"
         config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,7 +28,8 @@ class Config(object):
 
         with click.open_file(config_file, "w") as f:
             config = {"host": host, "access_key": api_key,
-                      "secret_key": api_secret}
+                      "secret_key": api_secret,
+                      "output_display_type":output_display_type}
             json.dump(config, f, indent=2)
             click.secho("Wrote configuration at %s" % config_file, err=True)
 
@@ -38,7 +40,7 @@ class Config(object):
             click.secho("Set \"%s\" as default configuration" %
                         configuration, err=True)
 
-    def load(self, log_active_configuration = True):
+    def load(self):
 
         try:
             with click.open_file(Path.home() / ".didimo" / "cli.json", "r") as f:
@@ -49,8 +51,7 @@ class Config(object):
                     click.secho(
                 "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
                     sys.exit(1)
-                if log_active_configuration:
-                    click.echo("Active Configuration: "+str(config["default"]))
+                
         except FileNotFoundError:
             click.secho(
                 "CLI configuration file not found. Run `didimo init`", err=True, fg='red')
@@ -73,7 +74,7 @@ class Config(object):
                 else:
                     click.secho(env, err=True)
 
-    def load_configuration(self, configuration):
+    def load_configuration(self, configuration, log_active_configuration = True):
         config_file = Path.home() / ".didimo" / (configuration + ".json")
         if not config_file.exists():
             click.secho("No configuration file for \"%s\"." %
@@ -94,6 +95,12 @@ class Config(object):
                     click.secho("No API host for \"%s\" configuration" %
                                 configuration, err=True, fg='red')
                     sys.exit(1)
+                self.output_display_type = config.get("output_display_type", "")
+                if log_active_configuration and (self.output_display_type != "json"):
+                    output_display_type_label = self.output_display_type
+                    if output_display_type_label == "":
+                        output_display_type_label = "(please re-initialize the cli configuration to set this value)"
+                    click.echo("Active configuration: "+str(configuration)+"    | Default output display type: "+output_display_type_label)
         except json.decoder.JSONDecodeError:
             click.secho("Error decoding configuration file %s" %
                         config_file, err=True, fg='red')

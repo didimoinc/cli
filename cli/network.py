@@ -38,7 +38,15 @@ def http_get(url, **kwargs):
         else:
             click.secho('Error %d' % r.status_code, err=True, fg='red')
             click.echo(r.text)
-            sys.exit(1)
+            return r
+    except:
+        click.echo("A Network Error Has Occured")
+        sys.exit(1)
+
+def http_get_no_error(url, **kwargs):
+    try:
+        r = requests.get(url, **kwargs)
+        return r
     except:
         click.echo("A Network Error Has Occured")
         sys.exit(1)
@@ -84,9 +92,11 @@ def http_post_no_break(url, **kwargs):
         click.echo(r.text)
         return r
 
-def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_status_code = True):
+def http_post_withphoto(url, access_key, payload, photo, photo_depth, photos_archive = None, check_status_code = True):
 
-    if photo_depth != None:
+    if photos_archive != None:
+        files = [('photos', (photos_archive, open(photos_archive, 'rb'), 'image/jpeg'))]
+    elif photo_depth != None:
         files = [
             ('photo', (photo, open(photo, 'rb'), 'image/jpeg')),
             ('depth', (photo_depth, open(photo_depth, 'rb'), 'image/png'))
@@ -105,6 +115,35 @@ def http_post_withphoto(url, access_key, payload, photo, photo_depth, check_stat
 
     r = requests.request("POST", url, headers=headers,
                          data=payload, files=files)
+
+    if check_status_code:
+        if r.status_code == 200 or r.status_code == 201:
+            return r
+        else:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo(r.text)
+            #click.echo("An error has occured. Please check your API key")
+            sys.exit(1)
+    else:
+        return r
+
+def http_request_json(url, method, access_key, payload, check_status_code = True):
+
+    headers = {
+        'DIDIMO-API-KEY': access_key,
+        'Didimo-Platform': "CLI",
+        'Didimo-Platform-Version':__version__,
+        'User-Agent': "didimo-cli/%s (%s, %s)" % (__version__,
+                                                              platform.python_version(),
+                                                              platform.system()),
+        'Content-Type': "application/json"
+    }
+
+    if method != "POST" and method != "PUT" and method != "PATCH":
+        raise Exception("unknown method")
+
+    r = requests.request(method, url, headers=headers,
+                         data=payload)
 
     if check_status_code:
         if r.status_code == 200 or r.status_code == 201:

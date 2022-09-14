@@ -15,12 +15,16 @@ from multiprocessing import current_process
 from multiprocessing import Process
 from .shared_queue import MyQueue, SharedCounter
 
-from .utils import print_key_value, print_status_header, print_status_row
-from .network import DidimoAuth, http_get, http_post, http_post_withphoto, http_post_no_break, http_put, http_delete, cache_this_call, clear_network_cache
+from .utils import print_key_value, print_status_header, print_status_row, create_set, print_didimo_generation_template_header, print_didimo_generation_template_row
+from .utils import print_bulk_requests_header, print_bulk_requests_row, print_bulk_request_item_header, print_bulk_request_item_row
+from .network import DidimoAuth, http_get, http_post, http_post_withphoto, http_post_no_break, http_put, http_delete, cache_this_call, clear_network_cache, http_request_json
 from .config import Config
-from .helpers import get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
+from .helpers import DidimoNotFoundException, get_didimo_status, download_didimo, URL, download_asset, get_asset_status, wait_for_dgp_completion
+from .helpers import get_cli_version_compatibility_rules, get_output_display_type_json_flag, list_aux, list_features_aux
+from .shared_processing import new_aux_shared_preprocess_batch_files, new_aux_shared_upload_processing_and_download, deformation_aux_shared_processing_and_download
+from .shared_processing import get_didimo_generation_template_aux, delete_didimo_generation_template_aux, generation_template_shared_response_processing
+from .shared_processing import new_aux_shared_upload_core, bulk_list_aux, bulk_get_aux
 from ._version import __version__
-
 
 pass_api = click.make_pass_decorator(Config)
 
@@ -31,11 +35,12 @@ HELP_OPTION_NAMES=['--help', '-h']
 #@click.pass_context
 class MultiVersionCommandGroup(click.Group):
     def get_command(self, ctx, cmd_name):
-        if cmd_name == "new":
-            # We are only controlling "new"
 
-            Config.load(self, False)
-            Config.load_configuration(self, self.configuration)
+        if cmd_name == "new" or cmd_name == "generation-template" or cmd_name == "bulk":
+            # We are only controlling "new" (to generate a new didimo) and "create" (to add a new didimo generation template)
+
+            Config.load(self)
+            Config.load_configuration(self, self.configuration, False)
 
             api_version = get_api_version(self)
             #print("Current API/DGP Version: "+api_version)
@@ -71,7 +76,7 @@ class MultiVersionCommandGroup(click.Group):
                 sys.exit(0)
 
             # Force the name to became the original one
-            command.name = "new"
+            command.name = cmd_name #"new"
             return command
 
         return click.Group.get_command(self, ctx, cmd_name)
@@ -83,7 +88,7 @@ class MultiVersionCommandGroup(click.Group):
         commands = [
             command
             for command in commands
-            if command == "new" or not command.startswith("new-")
+            if (command == "new" or not command.startswith("new-")) and not command.startswith("generation-template-") and not command.startswith("bulk-")
         ]
         return commands
 
@@ -96,6 +101,7 @@ def cli(ctx, config):
     Create, list and download didimos
     """
     ctx.ensure_object(Config)
+
     if ctx.invoked_subcommand not in ["init", "version"]:
         ctx.obj.load()
         if config != None:
@@ -110,86 +116,38 @@ def cli(ctx, config):
 @click.option('--host', type=URL(), prompt=True, help="API host with protocol.", default="https://api.didimo.co", show_default=True)
 @click.option('--api-key', prompt="API Key", help="API Key from your credentials.")
 @click.option('--api-secret', prompt="API Secret", help="API Secret from your credentials.")
+@click.option('--output-display-type', prompt=True, help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       default="human-readable", show_default=True)
 @pass_api
-def init(config, name, host, api_key, api_secret):
+def init(config, name, host, api_key, api_secret, output_display_type):
     """
     Initializes configuration
 
     <NAME> is the name of the configuration that will be added.
     """
-    config.init(name, host, api_key, api_secret)
+    config.init(name, host, api_key, api_secret, output_display_type)
 
 
-def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw):
+@cli.command(short_help="Get or set configuration")
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("name", required=False)
+@pass_api
+def config(config, name):
     """
-    List didimos
+    Get or set configuration
+
+    With no arguments, list all available configurations.
+
+    If <NAME> is provided, set that as the default configuration.
     """
-
-    url = config.api_host + api_path
-
-    url = url + "?page="+str(index)
-
-    if page_size != None:
-        url = url + "&page_size="+str(page_size)
-
-    sort_order_api = "-"
-    if sort_order != None:
-        if sort_order == "asc" or sort_order == "ascending":
-            sort_order_api = "+"
-        elif sort_order == "desc" or sort_order == "descending":
-            sort_order_api = "-"
-        else:
-            click.secho("Unknown sort order! Please correct the input. ", fg='red', err=True)
-            exit(1);
-
-    if sort_by != None:
-        url = url + "&order_by="+sort_order_api+sort_by
-
-    r = http_get(url, auth=DidimoAuth(config, api_path))
-    json_response = r.json()
-    #print(str(json_response))
-    is_error = r.json()['is_error'] if 'is_error' in json_response else False
-    if is_error:
-        click.echo("An error has occurred! Aborting...")
-        exit(1);
-
-    if raw:
-        click.echo(r.text)
+    if name == None:
+        config.list_configurations()
     else:
+        click.echo("Setting default configuration to \"%s\"" % name, err=True)
+        config.save_configuration(name)
+        click.secho("Configuration file saved.", fg='blue', err=True)
 
-        if index < 1:
-            sys.exit(0)
-
-        didimos = []
-        next_page = json_response['__links']['next'] if '__links' in json_response and 'next' in json_response['__links'] else None
-        page = index
-        didimos += r.json()['didimos']
-
-        while True:
-
-            while page != index:
-
-                if next_page != None:
-                    api_path = next_page
-                    url = api_path
-                    r = http_get(url, auth=DidimoAuth(config, api_path))
-                    json_response = r.json()
-                    didimos += json_response['didimos']
-                    next_page = json_response['__links']['next'] if '__links' in json_response else None
-                    page += 1
-                else:
-                    break
-
-            print_status_header()
-            for didimo in didimos:
-                print_status_row(didimo)
-
-            if navigate and next_page != None:
-                click.confirm('There are more results. Fetch next page?', abort=True)
-                index = index + 1
-                didimos = []
-            else:
-                break
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
@@ -205,47 +163,57 @@ def list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, 
               help="Sort by attribute name.")
 @click.option("-o", "--sort-order", required=False, default="descending", show_default=True,
               help="Sorting order of the content. Default is descending.")
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def list(config, page_size, index, navigate, sort_by, sort_order, raw):
+def list(config, page_size, index, navigate, sort_by, sort_order, output_display_type):
     """
     List didimos
     """
     api_path = "/v3/didimos/"
-    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, raw)
+    list_aux(config, api_path, page_size, index, navigate, sort_by, sort_order, output_display_type)
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
 @click.option("-n", "--number", required=False, default=1, show_default=True,
               help="Number of pages to query from the API. Each page has 10 didimos.")
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API, ignoring --number.")
+#@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+#              help="Do not format output, print raw JSON response from API, ignoring --number.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def list_demo_didimos(config, number, raw):
+def list_demo_didimos(config, number, output_display_type):
     """
     List demo didimos
     """
     api_path = "/v3/didimos/demos"
-    list_aux(config, api_path, 10, number, False, "created_at", "descending", raw)
+    list_aux(config, api_path, 10, number, False, "created_at", "descending", output_display_type)
 
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+#@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+#              help="Do not format output, print raw JSON response from API.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def account(config, raw):
+def account(config, output_display_type):
     """
     Get account information
     """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     api_path = "/v3/accounts/default/status"
     url = config.api_host + api_path
 
     r = http_get(url, auth=DidimoAuth(config, api_path))
     response = r.json()
     
-    if raw:
+    if output_display_type_json_flag:
         click.echo(r.text)
     else:
 
@@ -279,7 +247,6 @@ def list_features(config):
     List available features for creating a didimo
 
     Use the `new` command to use these accepted values.
-
     """
 
     accepted_input_types = []
@@ -318,6 +285,13 @@ def list_features(config):
         else:
             click.echo(" - "+str(item))
 
+
+#####################################
+#
+# Didimo Creation
+#
+######################################
+
 @cli.command(short_help="Create a didimo")
 @pass_api
 def new(config):
@@ -326,390 +300,10 @@ def new(config):
     """
     pass #this is a dummy function just to show up on the main menu
 
-
-
-def list_features_aux(config):
-    """
-    Get account features based on the pricing model
-    """
-    api_path = "/v3/accounts/default/status?ui=cli"
-    url = config.api_host + api_path
-
-    r = http_get(url, auth=DidimoAuth(config, api_path))
-    response = r.json()
-
-    output = {} #[]
-    #click.echo(r.text)
-    if "request_configuration_settings" in response:
-        requestConfigSettings = response["request_configuration_settings"]
-        #click.echo(requestConfigSettings)
-        if requestConfigSettings:
-            requestConfigObjects = requestConfigSettings["objects"]
-            #click.echo(requestConfigObjects)
-            #click.echo("")
-            if requestConfigObjects:
-                for requestConfigObject in requestConfigObjects:
-                    feature_name = requestConfigObject["code"]
-                    feature_group = requestConfigObject["group"]
-                    #click.echo("Feature: "+requestConfigObject["code"])
-                    requestConfigOptions = requestConfigObject["options"]
-                    output[feature_name] = { "group": feature_group, "options":[], "is_input_type": False}
-                    is_boolean = False
-                    is_input_type = False
-                    tier_level_restriction = False
-
-                    if "tier_level" in requestConfigObject:
-                        output[feature_name]["tier_level_restriction"] = True
-
-                    if requestConfigOptions:
-                        for requestConfigOption in requestConfigOptions:
-                            if "tier_level" in requestConfigOption:
-                                tier_level_restriction = True
-
-                            if "type" in requestConfigOption and requestConfigOption["type"] == "boolean":
-                                is_boolean = True
-                                break
-                            if "ui" in requestConfigOption and "is_input_type" in requestConfigOption["ui"] and requestConfigOption["ui"]["is_input_type"] == True:
-                                is_input_type = True
-
-                            #click.echo(requestConfigOption)
-                            #click.echo(requestConfigOption["label"])
-                            if "label" in requestConfigOption:
-                                output[feature_name]["options"].append(requestConfigOption["match"])
-
-                    output[feature_name]["is_input_type"] = is_input_type
-
-                    if is_boolean:
-                        output[feature_name]["options"] = "boolean" 
-                    else:
-                        #list is not working properly so let's remove duplicates manually
-                        distinct_list = []
-                        for item in output[feature_name]["options"]:
-                            try:
-                                #search for the item
-                                index = distinct_list.index(item)
-                            except ValueError:
-                                #print('item not present')
-                                distinct_list.append(item)
-                        output[feature_name]["options"] = distinct_list #to remove duplicates
-
-                    output[feature_name]["tier_level_restriction"] = tier_level_restriction
-                    #click.echo("----")
-                #click.echo(output)
-    return output
-
-
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
-@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
-@click.option('--depth', '-d',
-              type=click.Path(), required=False,
-              help="Create didimo with depth.")
-@click.option('--feature', '-f', multiple=True,
-              type=click.Choice(
-                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
-              help="Create didimo with optional features. This flag can be used multiple times.")
-@click.option('--max-texture-dimension', '-m', multiple=False,
-              type=click.Choice(
-                  ["512", "1024", "2048"]),
-              help="Create didimo with optional max texture dimension.")
-@click.option('--no-download', '-n', is_flag=True, default=False,
-              help="Do not download didimo.")
-@click.option('--no-wait', '-w', is_flag=True, default=False,
-              help="Do not wait for didimo creation and do not download.")
-@click.option("--output", "-o", type=click.Path(), required=False,
-              help="Path to download the didimo. If multiple package types "
-              "are present or if the flags --no-wait or --no-download "
-              "are present, this option is ignored. [default: <ID>.zip]")
-@click.option('--package-type', '-p', multiple=True,
-              type=click.Choice(["fbx", "gltf"]),
-              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
-@click.option('--ignore-cost', is_flag=True,
-              default=False,
-              help="Do not prompt user to confirm operation cost.")
-@click.option("--version", "-v",
-              type=click.Choice(["2.5.2"]),
-              default="2.5.2",
-              help="Version of the didimo.", show_default=True)
-@pass_api
-#def new(config, type, input, depth, feature, max_texture, no_download, no_wait, output, package_type, version, ignore_cost):
-def new_2_5_2(config, input_type, input, depth, feature, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
-    """
-    Create a didimo
-
-    TYPE is the type of input used to create the didimo. Accepted values are:
-
-    \b
-        - photo (input must be a .jpg/.jpeg/.png)
-        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
-
-        For more information on the input types, visit
-        https://developer.didimo.co/docs/cli\b
-
-    INPUT is the path to the input file. It can also be a zip file or a folder containing multiple photos (all files will be treated as input photos).
-
-    \b
-    Examples:
-        Create a didimo from a photo
-        $ didimo new photo /path/input.jpg
-
-    """
-
-    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
-
-    api_path = "/v3/didimos"
-    url = config.api_host + api_path
-
-    payload = {
-#        'input_type': 'photo'
-    }
-
-    if input_type != None:
-        payload["input_type"] = input_type
-
-    if len(package_type) > 0:
-        payload["transfer_formats"] = package_type
-        package_type = package_type[0]
-    else:
-        package_type = "gltf"
-
-    if max_texture_dimension != None:
-        payload["max_texture_dimension"] = max_texture_dimension
-
-    for feature_item in feature:
-        payload[feature_item] = 'true'
-    
-    if not ignore_cost:   
-        # check how many points a generation will consume before they are consumed 
-        # and prompt user to confirm operation before proceeding with the didimo generation request
-        if batch_files != None:
-            #print(batch_files[0])
-            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth)
-        else:
-            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth)
-        
-        json_response = r.json()
-        is_error = r.json()['is_error'] if 'is_error' in json_response else False
-        if is_error:
-            click.echo("The requested configuration is invalid! Aborting...")
-            exit(1);
-
-        estimated_cost = r.json()['cost']
-
-        if batch_files != None:
-            total_estimated_cost = estimated_cost * len(batch_files)
-            click.echo("The cost of each didimo generation is: "+str(estimated_cost))
-            click.echo("The total cost of this batch operation is: "+str(total_estimated_cost))
-        else:
-            click.echo("The cost of this operation is: "+str(estimated_cost))
-        
-        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
-        click.echo("Proceeding...")
-
-    batch_flag = True
-    if batch_files == None:
-        batch_files = [input]
-        batch_flag = False
-
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
-
-
-def new_aux_shared_preprocess_batch_files(input, input_type):
-    """
-    Shared code that handles preprocessing batch files (zip or directory) from the provided input
-    """
-    batch_flag = False
-    batch_processing_path = None
-    batch_total_files = 0
-    temp_batch_files = None
-    batch_files = []
-
-    #if (input end with zip or /):
-    if input.endswith('.zip') or os.path.isdir(input):
-        if input_type != "photo":
-            click.echo("Batch processing is only available for the photo input type. Please correct the command and try again.")
-            return None
-        #if ignore_cost != True:
-        #    echo("Batch processing does not support didimo cost verification. Please use the --ignore-cost option and try again.")
-        #    return
-        else:
-            batch_flag = True
-            separator = "/"
-            if platform.system() == "Windows":
-                separator = "\\"
-            #TODO: uncompress zip to temp and read directory, or read directory, according to given input being zip or folder
-            if input.endswith('.zip'):
-                temp_directory_to_extract_to = "temp"
-                path_prefix = temp_directory_to_extract_to
-  
-                directory = os.getcwd()
-                if not directory.endswith(separator):
-                    directory = directory + separator
-                batch_processing_path = directory+temp_directory_to_extract_to 
-                shutil.rmtree(temp_directory_to_extract_to, ignore_errors=True)
-                with zipfile.ZipFile(input, 'r') as zip_ref:
-                    zip_ref.extractall(temp_directory_to_extract_to)
-                    zip_ref.close()
-            elif os.path.isdir(input):
-                batch_processing_path = input
-                path_prefix = input
-            else:
-                click.echo("file not supported")
-                return None
-            temp_batch_files=os.listdir(batch_processing_path)
-            #batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
-            #click.echo("Batch processing - path: " + batch_processing_path)
-            #click.echo("Batch processing - files count: " + str(batch_total_files))
-
-            if not path_prefix.endswith(separator):
-                path_prefix = path_prefix + separator
-            for idx, input_file in enumerate(temp_batch_files):
-                #print(input_file)
-                if input_file != ".DS_Store" and not os.path.isdir(path_prefix + input_file):
-                    batch_files.append(path_prefix + input_file)
-                    print(path_prefix + input_file)
-
-            batch_total_files = len(fnmatch.filter(batch_files, '*.*'))
-            click.echo("Batch processing - files count: " + str(batch_total_files))
-
-            return batch_files
-    else:
-        return None
-
-def new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag):
-    """
-    Shared code that handles polling status and managing download
-    """
-    
-    batch_didimo_ids = []
-    #click.echo("Uploading files...")
-    with click.progressbar(length=len(batch_files), label='Uploading files...', show_eta=False) as bar:
-                    last_value = 0
-                    i = 0
-                    
-                    for input_file in batch_files:
-                        r = http_post_withphoto(url, config.access_key, payload, input_file, depth, False)
-
-                        if r.status_code != 200 and r.status_code != 201:
-                            click.secho('\nError %d uploading %s: %s' % (r.status_code, input_file, r.text), err=True, fg='red')
-                            didimo_id = None
-                        else:
-                            didimo_id = r.json()['key']
-
-                        batch_didimo_ids.append(didimo_id)
-                        i = i + 1
-
-                        update = i - last_value
-                        last_value = i
-                        bar.update(update)
-
-                        #click.echo(""+str(i)+"/"+str(len(batch_files)))
-
-    click.echo("Checking progress...")
-    complete_tasks = MyQueue()
-    jobs = []
-    i = 0
-    for input_file in batch_files:
-
-        if not no_wait:
-
-            didimo_id = batch_didimo_ids[i]
-            i = i + 1
-
-            if didimo_id == None:
-                continue
-
-            if batch_flag: #fork and don't output progress bars
-
-                no_error = None
-                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
-                    last_value = 0
-                    initing_progress_bar = True
-                    while True:
-                        if not initing_progress_bar:
-                            response = get_didimo_status(config, didimo_id)
-                            #click.echo(response)
-                            #click.echo("Didimo "+didimo_id+": "+str(response['percent'])+"")
-                            percent = response.get('percent', 100)
-                            update = percent - last_value
-                            last_value = percent
-                            bar.update(update)
-                            if response['status_message'] != "":
-                                no_error = False
-                                click.secho(err=True)
-                                click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
-                                break
-                            if response['status'] == 'done':
-                                no_error = True
-                                break
-                        else:
-                            bar.update(0)
-                            initing_progress_bar = False
-                        time.sleep(2)
-                        
-                if not no_download and no_error == True:
-
-                    #click.echo("Downloading didimo "+didimo_id+"...")
-
-                    if output is None:
-                        output = ""
-                    elif output != "":
-                        if not output.endswith('/'):
-                            output = output + "/"
-
-                    while True:
-                        active_child_count = len(jobs)-complete_tasks.qsize()
-                        if active_child_count < 5:
-                            p = multiprocessing.Process(target=download_didimo_subprocess, args=(config, didimo_id, "", output, False,complete_tasks,))
-                            jobs.append(p)
-                            p.start()
-                            break
-                        else:
-                            #click.echo("Waiting to download | Jobs:"+str(len(jobs))+" | Active processes:"+str(active_child_count)+" | Completed:"+str(complete_tasks.qsize()))
-                            time.sleep(1)
-                    
-            else:
-                with click.progressbar(length=100, label='Creating didimo '+didimo_id, show_eta=False) as bar:
-                    last_value = 0
-                    while True:
-                        response = get_didimo_status(config, didimo_id)
-                        percent = response.get('percent', 100)
-                        update = percent - last_value
-                        last_value = percent
-                        bar.update(update)
-                        if response['status_message'] != "":
-                            click.secho(err=True)
-                            click.secho('Error: %s' %
-                                        response["status_message"], err=True, fg='red')
-                            sys.exit(1)
-                        if response['status'] == 'done':
-                            break
-                        time.sleep(2)
-                if not no_download:
-                    if output is None:
-                        output = ""
-                    else:
-                        if not output.endswith('/'):
-                            output = output + "/"
-                    download_didimo(config, didimo_id, "", output)
-
-    #check if child processes are still running and wait for them to finish
-    if batch_flag:
-        click.echo("Please wait while the remaining files are finished downloading...")
-        for job in jobs:
-            job.join()
-    click.echo("All done!")
-
-def download_didimo_subprocess(config, didimo_id, package_type, output, showProgressBar, complete_tasks):
-    download_didimo(config, didimo_id, package_type, output, showProgressBar)
-    complete_tasks.put(didimo_id + ' is done by ' + current_process().name)
-
-
-@cli.command(short_help="Create a didimo")
-@click.help_option(*HELP_OPTION_NAMES)
-@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
-@click.argument("input", type=click.Path(exists=True), required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=False, metavar="TYPE")
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
               help="Create didimo with depth.")
@@ -747,12 +341,12 @@ def download_didimo_subprocess(config, didimo_id, package_type, output, showProg
 @click.option('--ignore-cost', is_flag=True,
               default=False,
               help="Do not prompt user to confirm operation cost.")
-@click.option("--version", "-v",
-              type=click.Choice(["2.5.7"]),
-              default="2.5.7",
-              help="Version of the didimo.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@click.option('--template', help="Didimo generation template UUID.", required=False)
 @pass_api
-def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garment, gender, max_texture_dimension, no_download, no_wait, output, package_type, ignore_cost, output_display_type, template):
     """
     Create a didimo
 
@@ -767,21 +361,58 @@ def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garme
 
     INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos)
 
+    TEMPLATE_UUID is the didimo generation template UUID. The specified options and arguments will override the template values accordingly.\n
+
     \b
     Examples:
         Create a didimo from a photo
-        $ didimo new photo /path/input.jpg
-
+        $ didimo new /path/input.jpg photo
     """
+    template_uuid = template
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
-    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
+    if output_display_type_json_flag and ignore_cost == False:
+        click.secho("The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting...", err=True, fg='red')
+        exit(1);
+
+    if template_uuid != None:
+        #get didimo generation template so that we can override values as commanded
+        r = get_didimo_generation_template_aux(config, template_uuid, output_display_type, True)
+        if r.status_code != 200:
+            if output_display_type_json_flag:
+                click.echo( {
+                                "error": 1,
+                                "template_uuid":template_uuid,
+                                "message":"There was an error accessing the didimo generation template with the provided uuid: "+template_uuid
+                           })
+            else:
+                click.echo("There was an error accessing the didimo generation template with the provided uuid: %s" % template_uuid, err=True) 
+            exit(1);
+        else:   
+            payload = json.loads(r.json()["settings"])
+            if "input_type" not in payload and input_type == None:
+                click.echo( {
+                                "error": 1,
+                                "input_type":input_type,
+                                "message":"The command configuration is invalid! Input type is missing. Aborting..."
+                           })
+                exit(1);
+            elif input_type == None and "input_type" in payload:
+                input_type = payload["input_type"]
+    elif input_type == None:
+        click.echo( {
+                        "error": 1,
+                        "input_type":input_type,
+                        "message":"The command configuration is invalid! Input type is not defined. Aborting..."
+                   })
+        exit(1);
+    else:
+        payload = {} 
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type, output_display_type_json_flag)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
-
-    payload = {
-#        'input_type': 'photo'
-    }
 
     if input_type != None:
         payload["input_type"] = input_type
@@ -797,9 +428,6 @@ def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garme
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
-        package_type = package_type[0]
-    else:
-        package_type = "gltf"
 
     if max_texture_dimension != None:
         payload["max_texture_dimension"] = max_texture_dimension
@@ -838,13 +466,13 @@ def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garme
         batch_files = [input]
         batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag, output_display_type_json_flag)
 
 
 @cli.command(short_help="Create a didimo")
 @click.help_option(*HELP_OPTION_NAMES)
-@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
 @click.argument("input", type=click.Path(exists=True), required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=False, metavar="TYPE")
 @click.option('--depth', '-d',
               type=click.Path(), required=False,
               help="Create didimo with depth.")
@@ -882,7 +510,7 @@ def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garme
 @click.option('--body-pose', '-bp',
               type=click.Choice(["A", "T"]),
               help="Specify body pose for this didimo. This option is only available for full-body didimos.", show_default=False)
-@click.option('--profile', default="standard",
+@click.option('--profile', 
               type=click.Choice(["standard", "optimized"]),
               help="Specify a profile to drive this didimo generation.", show_default=False)
 @click.option('--no-download', '-n', is_flag=True, default=False,
@@ -899,12 +527,12 @@ def new_2_5_7(config, input_type, input, depth, feature, avatar_structure, garme
 @click.option('--ignore-cost', is_flag=True,
               default=False,
               help="Do not prompt user to confirm operation cost.")
-@click.option("--version", "-v",
-              type=click.Choice(["2.5.10"]),
-              default="2.5.10",
-              help="Version of the didimo.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@click.option('--template', help="Didimo generation template UUID.", required=False)
 @pass_api
-def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, body_pose, profile, no_download, no_wait, output, package_type, ignore_cost, version):
+def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garment, gender, hair, body_pose, profile, no_download, no_wait, output, package_type, ignore_cost, output_display_type, template):
     """
     Create a didimo
 
@@ -919,21 +547,63 @@ def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garm
 
     INPUT is the path to the input file (which must be a .jpg/.jpeg/.png/.zip or a directory containing photos)
 
+    TEMPLATE_UUID is the didimo generation template UUID. The specified options and arguments will override the template values accordingly.\n
+
     \b
     Examples:
         Create a didimo from a photo
-        $ didimo new photo /path/input.jpg
-
+        $ didimo new /path/input.jpg photo
     """
+    template_uuid = template
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
-    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
+    if output_display_type_json_flag and ignore_cost == False:
+        #click.secho("The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting...", err=True, fg='red')
+        click.echo( {
+                                "error": 1,
+                                "input":input,
+                                "message":"The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting..."
+                           })
+        exit(1);
+
+    if template_uuid != None:
+        #get didimo generation template so that we can override values as commanded
+        r = get_didimo_generation_template_aux(config, template_uuid, output_display_type, True)
+        if r.status_code != 200:
+            if output_display_type_json_flag:
+                click.echo( {
+                                "error": 1,
+                                "template_uuid":template_uuid,
+                                "message":"There was an error accessing the didimo generation template with the provided uuid: "+template_uuid
+                           })
+            else:
+                click.echo("There was an error accessing the didimo generation template with the provided uuid: %s" % template_uuid, err=True) 
+            exit(1);
+        else:   
+            payload = json.loads(r.json()["settings"])
+            if "input_type" not in payload and input_type == None:
+                click.echo( {
+                                "error": 1,
+                                "input_type":input_type,
+                                "message":"The command configuration is invalid! Input type is missing. Aborting..."
+                           })
+                exit(1);
+            elif input_type == None and "input_type" in payload:
+                input_type = payload["input_type"]
+    elif input_type == None:
+        click.echo( {
+                        "error": 1,
+                        "input_type":input_type,
+                        "message":"The command configuration is invalid! Input type is not defined. Aborting..."
+                   })
+        exit(1);
+    else:
+        payload = {} 
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type, output_display_type_json_flag)
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
-
-    payload = {
-#        'input_type': 'photo'
-    }
 
     if input_type != None:
         payload["input_type"] = input_type
@@ -962,9 +632,6 @@ def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garm
 
     if len(package_type) > 0:
         payload["transfer_formats"] = package_type
-        package_type = package_type[0]
-    else:
-        package_type = "gltf"
 
     for feature_item in feature:
         payload[feature_item] = 'true'
@@ -1000,7 +667,7 @@ def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garm
         batch_files = [input]
         batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag, output_display_type_json_flag)
 
 
 
@@ -1031,12 +698,11 @@ def new_2_5_10(config, input_type, input, depth, feature, avatar_structure, garm
 @click.option('--ignore-cost', is_flag=True,
               default=False,
               help="Do not prompt user to confirm operation cost")
-@click.option("--version", "-v",
-              type=click.Choice(["2.5"]),
-              default="2.5",
-              help="Version of the didimo.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def new_dynamic(config, type, input, feature, no_download, no_wait, output, package_type, version, ignore_cost):
+def new_dynamic(config, type, input, feature, no_download, no_wait, output, package_type, ignore_cost, output_display_type):
     """
     Create a didimo
 
@@ -1068,13 +734,18 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
         Create a didimo with max_texture_dimension feature from a photo \b
 
             $ didimo new photo -f max_texture_dimension=2048 /path/input.jpg
-
     """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
-    batch_files = new_aux_shared_preprocess_batch_files(input, input_type)
+    if output_display_type_json_flag and ignore_cost == False:
+        click.secho("The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting...", err=True, fg='red')
+        exit(1);
 
-    click.echo("")
-    click.echo("Obtaining params list...")
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type, output_display_type_json_flag)
+
+    if not output_display_type_json_flag:
+        click.echo("")
+        click.echo("Obtaining params list...")
     feature_param = []
     feature_param_value = []
     invalid_param_request = []
@@ -1092,10 +763,12 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
         #click.echo("feature_param: "+str(feature_param))
         #click.echo("feature_param_value: "+str(feature_param_value))
 
-        click.echo("Obtaining feature list...")
+        if not output_display_type_json_flag:
+            click.echo("Obtaining feature list...")
         featureList = list_features_aux(config)
 
-        click.echo("Obtaining input types...")
+        if not output_display_type_json_flag:
+            click.echo("Obtaining input types...")
         for item in featureList:
             if "group" in featureList[item]:
                 if featureList[item]["is_input_type"] == True: 
@@ -1113,8 +786,8 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
         #click.echo(accepted_input_types)
         #click.echo(accepted_targets)
 
-
-        click.echo("Crosschecking requested features...")
+        if not output_display_type_json_flag:
+            click.echo("Crosschecking requested features...")
 
         for name in feature_param:
             if name not in featureList:
@@ -1145,7 +818,8 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
             click.echo("Error - invalid features requested: "+str(invalid_param_request))
             return
 
-    click.echo("Proceeding...")
+    if not output_display_type_json_flag:
+        click.echo("Proceeding...")
 
     api_path = "/v3/didimos"
     url = config.api_host + api_path
@@ -1164,17 +838,15 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
     else:
         package_type = "default" #how to get this default value?? glft
 
-    #click.echo("payload: "+str(payload))
-
     depth = None
 
     if not ignore_cost:    
         # check how many points a generation will consume before they are consumed 
         # and prompt user to confirm operation before proceeding with the didimo generation request
         if batch_files != None:
-            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth, False)
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, batch_files[0], depth, None, False)
         else:
-            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, False)
+            r = http_post_withphoto(url+"-cost", config.access_key, payload, input, depth, None, False)
 
         is_error = ('status' in r.json() and r.json()['status'] != 201) or ('is_error' in r.json() and r.json()['is_error'])
         if is_error:
@@ -1199,18 +871,531 @@ def new_dynamic(config, type, input, feature, no_download, no_wait, output, pack
         batch_files = [input]
         batch_flag = False
 
-    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output,batch_flag)
+    new_aux_shared_upload_processing_and_download(config, url, batch_files, depth, payload, no_wait, no_download, output, batch_flag, output_display_type_json_flag)
 
+#####################################
+#
+# BULK REQUESTS
+#
+######################################
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def bulk(config):
+    """
+    Perform bulk requests related operations
+    """
+    pass
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def bulk_2_5_7(config):
+    """
+    Perform bulk requests related operations on DGP compatible version 2.5.7
+    """
+    pass
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def bulk_2_5_10(config):
+    """
+    Perform bulk requests related operations on DGP compatible version 2.5.10
+    """
+    pass
+
+#### LIST ########################
+
+@bulk_2_5_7.command(short_help='List bulk requests')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.option("--filter","-f", multiple=False, help="Filter by status.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def list(config, group_type, filter, output_display_type):
+    """
+    List bulk requests on DGP compatible version 2.5.7
+    """
+    bulk_list_aux(config, group_type, filter, output_display_type)
+
+@bulk_2_5_10.command(short_help='List bulk requests')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.option("--filter","-f", multiple=False, help="Filter by status.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def list(config, group_type, filter, output_display_type):
+    """
+    List bulk requests on DGP compatible version 2.5.10
+    """
+    bulk_list_aux(config, group_type, filter, output_display_type)
+
+##### GET ###########################
+
+@bulk_2_5_7.command(short_help='Get bulk request details')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def get(config, group_type, uuid, output_display_type):
+    """
+    Get bulk request details on DGP compatible version 2.5.7
+
+    UUID is the bulk request UUID.
+    """
+    bulk_get_aux(config, group_type, uuid, output_display_type)
+
+@bulk_2_5_10.command(short_help='Get bulk request details')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def get(config, group_type, uuid, output_display_type):
+    """
+    Get bulk request details on DGP compatible version 2.5.10
+
+    UUID is the bulk request UUID.
+    """
+    bulk_get_aux(config, group_type, uuid, output_display_type)
+
+#### CREATE NEW BULK REQUEST ########
+
+@bulk_2_5_7.command(short_help="Create a bulk request")
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.argument("input", type=click.Path(exists=True), required=True)
+@click.argument("input_type", type=click.Choice(["photo"]), required=False, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture-dimension', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty", "business"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@click.option('--template', help="Didimo generation template UUID.", required=False)
+@pass_api
+def new(config, group_type, input, input_type, feature, avatar_structure, garment, gender, max_texture_dimension, package_type, ignore_cost, output_display_type, template):
+    """
+    Create a bulk request on DGP compatible version 2.5.7
+
+    GROUP is the type of object produced. Accepted values are:
+
+    \b
+        - didimos (input must be an archive containing image files: .jpg/.jpeg/.png)
+
+    INPUT is the path to the input file (which must be a .zip containing photos, according to the didimos group type)
+
+    INPUT TYPE is the type of the files used to produce didimos (which must be a image file: .jpg/.jpeg/.png). Accepted values are:
+
+    \b
+        - photo (input must be image files: .jpg/.jpeg/.png)
+
+        For more information on this operation, visit
+        https://developer.didimo.co/docs/cli\b
+
+    TEMPLATE_UUID is the didimo generation template UUID. The specified options and arguments will override the template values accordingly.\n
+
+    \b
+    Examples:
+        Create a bulk request to generate didimos from a zip of photos
+        $ didimo bulk new didimos /path/input.zip photo
+    """
+    template_uuid = template
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    if output_display_type_json_flag and ignore_cost == False:
+        #click.secho("The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting...", err=True, fg='red')
+        click.echo( {
+                                "error": 1,
+                                "input":input,
+                                "message":"The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting..."
+                           })
+        exit(1);
+
+    if template_uuid != None:
+        #pre-validate that the user can access the didimo generation template 
+        r = get_didimo_generation_template_aux(config, template_uuid, output_display_type, True)
+        if r.status_code != 200:
+            if output_display_type_json_flag:
+                click.echo( {
+                                "error": 1,
+                                "template_uuid":template_uuid,
+                                "message":"There was an error accessing the didimo generation template with the provided uuid: "+template_uuid
+                           })
+            else:
+                click.echo("There was an error accessing the didimo generation template with the provided uuid: %s" % template_uuid, err=True) 
+            exit(1);
+        else:   
+            payload = json.loads(r.json()["settings"])
+            if "input_type" not in payload and input_type == None:
+                click.echo( {
+                                "error": 1,
+                                "input_type":input_type,
+                                "message":"The command configuration is invalid! Input type is missing. Aborting..."
+                           })
+                exit(1);
+            elif input_type == None and "input_type" in payload:
+                input_type = payload["input_type"]
+    elif input_type == None:
+        click.echo( {
+                        "error": 1,
+                        "input_type":input_type,
+                        "message":"The command configuration is invalid! Input type is not defined. Aborting..."
+                   })
+        exit(1);
+    else:
+        payload = {} 
+
+    if not input.endswith(".zip"):
+        if output_display_type_json_flag:
+            click.echo( {
+                        "error": 1,
+                        "input":input,
+                        "message":"The input must point to a Zip file."
+                        })
+        else:
+            click.secho('\nError: The input must point to a Zip file.', err=True, fg='red')
+        exit(1);
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type, output_display_type_json_flag)
+
+    if batch_files == None:
+        if output_display_type_json_flag:
+            click.echo( {
+                        "error": 1,
+                        "input":input,
+                        "message":"The input is invalid! Zip verification failed. Aborting..."
+                        })
+        else:
+            click.secho('\nError: The input is invalid! Zip verification failed. Aborting...', err=True, fg='red')
+        exit(1);
+
+    api_path = "/v3/"+group_type+"/bulks"
+    url = config.api_host + api_path
+
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if avatar_structure != None:
+        payload["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        payload["garment"] = garment
+
+    if gender != None:
+        payload["gender"] = gender
+    
+    if len(package_type) > 0:
+        payload["transfer_formats"] = package_type
+
+    if max_texture_dimension != None:
+        payload["max_texture_dimension"] = max_texture_dimension
+
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+
+    depth = None
+
+    if not ignore_cost:    
+        # estimate how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the bulk request
+        cost_estimation_api_path = "/v3/didimos-cost"
+        cost_estimation_url = config.api_host + cost_estimation_api_path
+        r = http_post_withphoto(cost_estimation_url, config.access_key, payload, batch_files[0], depth)
+
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+
+        total_estimated_cost = estimated_cost * len(batch_files)
+        click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+        click.echo("The total cost of this bulk operation is: "+str(total_estimated_cost))
+        
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
+
+    r = new_aux_shared_upload_core(config, url, input, depth, input, payload, output_display_type_json_flag)
+    r_json = r
+    if r_json['error'] == 1:
+        upload_error_response = r
+        if output_display_type_json_flag:
+            click.secho("%s"%str(r_json), fg="red", err=True)
+        else:
+            click.secho('\nError %d uploading %s: \n%s' % (r.status_code, input, r.text), err=True, fg='red')
+    else:
+        if output_display_type_json_flag:
+            click.secho("%s"%str(r_json), fg="blue", err=False)
+        else:
+            click.secho('\nCreated bulk from %s: \n%s' % (input, str(r_json)), err=False, fg='blue')
+
+
+@bulk_2_5_10.command(short_help="Create a bulk request")
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("group_type", type=click.Choice(["didimos"]), required=True, metavar="GROUP")
+@click.argument("input", type=click.Path(exists=True), required=True)
+@click.argument("input_type", type=click.Choice(["photo"]), required=False, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty", "business"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "hair_001","hair_002","hair_003","hair_004","hair_005","hair_006","hair_007","hair_008","hair_009","hair_010","hair_011"]),
+              help="Create didimo with hair option.")
+@click.option('--body-pose', '-bp',
+              type=click.Choice(["A", "T"]),
+              help="Specify body pose for this didimo. This option is only available for full-body didimos.", show_default=False)
+@click.option('--profile',
+              type=click.Choice(["standard", "optimized"]),
+              help="Specify a profile to drive this didimo generation.", show_default=False)
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--ignore-cost', is_flag=True,
+              default=False,
+              help="Do not prompt user to confirm operation cost.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@click.option('--template', help="Didimo generation template UUID.", required=False)
+@pass_api
+def new(config, group_type, input, input_type, feature, avatar_structure, garment, gender, hair, body_pose, profile, package_type, ignore_cost, output_display_type, template):
+    """
+    Create a bulk request on DGP compatible version 2.5.10
+
+    GROUP is the type of object produced. Accepted values are:
+
+    \b
+        - didimos (input must be an archive containing image files: .jpg/.jpeg/.png)
+
+    INPUT is the path to the input file (which must be a .zip containing photos, according to the didimos group type)
+
+    INPUT TYPE is the type of the files used to produce didimos (which must be a image file: .jpg/.jpeg/.png). Accepted values are:
+
+    \b
+        - photo (input must be image files: .jpg/.jpeg/.png)
+
+        For more information on this operation, visit
+        https://developer.didimo.co/docs/cli\b
+
+    TEMPLATE_UUID is the didimo generation template UUID. The specified options and arguments will override the template values accordingly.\n
+
+    \b
+    Examples:
+        Create a bulk request to generate didimos from a zip of photos
+        $ didimo bulk new didimos /path/input.zip photo
+    """
+    template_uuid = template
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    if output_display_type_json_flag and ignore_cost == False:
+        #click.secho("The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting...", err=True, fg='red')
+        click.echo( {
+                                "error": 1,
+                                "input":input,
+                                "message":"The command configuration is invalid! You must explicitly ignore the cost prompt by setting the ignore cost flag in order to use JSON as the output display type. Aborting..."
+                           })
+        exit(1);
+
+    if template_uuid != None:
+        #pre-validate that the user can access the didimo generation template 
+        r = get_didimo_generation_template_aux(config, template_uuid, output_display_type, True)
+        if r.status_code != 200:
+            if output_display_type_json_flag:
+                click.echo( {
+                                "error": 1,
+                                "template_uuid":template_uuid,
+                                "message":"There was an error accessing the didimo generation template with the provided uuid: "+template_uuid
+                           })
+            else:
+                click.echo("There was an error accessing the didimo generation template with the provided uuid: %s" % template_uuid, err=True) 
+            exit(1);
+        else:   
+            payload = json.loads(r.json()["settings"])
+            if "input_type" not in payload and input_type == None:
+                click.echo( {
+                                "error": 1,
+                                "input_type":input_type,
+                                "message":"The command configuration is invalid! Input type is missing. Aborting..."
+                           })
+                exit(1);
+            elif input_type == None and "input_type" in payload:
+                input_type = payload["input_type"]
+    elif input_type == None:
+        click.echo( {
+                        "error": 1,
+                        "input_type":input_type,
+                        "message":"The command configuration is invalid! Input type is not defined. Aborting..."
+                   })
+        exit(1);
+    else:
+        payload = {} 
+
+    if not input.endswith(".zip"):
+        if output_display_type_json_flag:
+            click.echo( {
+                        "error": 1,
+                        "input":input,
+                        "message":"The input must point to a Zip file."
+                        })
+        else:
+            click.secho('\nError: The input must point to a Zip file.', err=True, fg='red')
+        exit(1);
+
+    batch_files = new_aux_shared_preprocess_batch_files(input, input_type, output_display_type_json_flag)
+
+    if batch_files == None:
+        if output_display_type_json_flag:
+            click.echo( {
+                        "error": 1,
+                        "input":input,
+                        "message":"The input is invalid! Zip verification failed. Aborting..."
+                        })
+        else:
+            click.secho('\nError: The input is invalid! Zip verification failed. Aborting...', err=True, fg='red')
+        exit(1);
+
+    api_path = "/v3/"+group_type+"/bulks"
+    url = config.api_host + api_path
+
+    if input_type != None:
+        payload["input_type"] = input_type
+
+    if avatar_structure != None:
+        payload["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        payload["garment"] = garment
+
+    if gender != None:
+        payload["gender"] = gender
+
+    if hair != None:
+        payload["hair"] = hair
+
+    if body_pose != None:
+        if avatar_structure == "full-body":
+            payload["body_pose"] = body_pose
+        else:
+            click.echo("The body pose feature is only available for full body didimos.", err=True)
+            exit(1);
+    
+    if profile != None:
+        payload["profile"] = profile
+
+    if len(package_type) > 0:
+        payload["transfer_formats"] = package_type
+
+    for feature_item in feature:
+        payload[feature_item] = 'true'
+
+    depth = None
+
+    if not ignore_cost:    
+        # estimate how many points a generation will consume before they are consumed 
+        # and prompt user to confirm operation before proceeding with the bulk request
+        cost_estimation_api_path = "/v3/didimos-cost"
+        cost_estimation_url = config.api_host + cost_estimation_api_path
+        r = http_post_withphoto(cost_estimation_url, config.access_key, payload, batch_files[0], depth)
+
+        json_response = r.json()
+        is_error = r.json()['is_error'] if 'is_error' in json_response else False
+        if is_error:
+            click.echo("The requested configuration is invalid! Aborting...")
+            exit(1);
+
+        estimated_cost = r.json()['cost']
+
+        total_estimated_cost = estimated_cost * len(batch_files)
+        click.echo("The cost of each didimo generation is: "+str(estimated_cost))
+        click.echo("The total cost of this bulk operation is: "+str(total_estimated_cost))
+        
+        click.confirm('Are you sure you want to proceed with the didimo creation?', abort=True)
+        click.echo("Proceeding...")
+
+    r = new_aux_shared_upload_core(config, url, input, depth, input, payload, output_display_type_json_flag)
+    r_json = r
+    if r_json['error'] == 1:
+        upload_error_response = r
+        if output_display_type_json_flag:
+            click.secho("%s"%str(r_json), fg="red", err=True)
+        else:
+            click.secho('\nError %d uploading %s: \n%s' % (r.status_code, input, r.text), err=True, fg='red')
+    else:
+        if output_display_type_json_flag:
+            click.secho("%s"%str(r_json), fg="blue", err=False)
+        else:
+            click.secho('\nCreated bulk from %s: \n%s' % (input, str(r_json)), err=False, fg='blue')
+
+
+#####################################
+#
+# DIDIMO: get status, inspect, delete
+#
+######################################
 
 @cli.command(short_help='Get status of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True, nargs=-1)
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @click.option("-s", "--silent", required=False, is_flag=True, default=False,
               help="Do not print anything. See help text for exit codes.")
 @pass_api
-def status(config, id, raw, silent):
+def status(config, id, output_display_type, silent):
     """
     Get status of didimos
 
@@ -1227,36 +1412,44 @@ def status(config, id, raw, silent):
       - 1: At least one didimo is in "Error" state
       - 2: At least one didimo is in "Pending" or "Processing" state
     """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     didimos = []
 
-    ids = set(id)
+    ids = create_set(id)
 
     # read didimo ids if used with a pipe
     if "-" in ids:
         ids = sys.stdin.readlines()
 
-    for didimo in ids:
+    try:
 
-        response = get_didimo_status(config, didimo.rstrip())
+        for didimo in ids:
 
-        # TODO
-        # Remove this block when /status endpoint is consistent with /list
-        if response['status_message'] != "":
-            response["key"] = didimo.rstrip()
-            response["status"] = "error"
+            response = get_didimo_status(config, didimo.rstrip())
 
-        didimos.append(response)
-        if silent:
-            if response["status"] == "error":
-                click.echo("Error on \"%s\"" % response["key"], err=True)
-                sys.exit(1)
-            if response["status"] in ["pending", "processing"]:
-                sys.exit(2)
+            # TODO
+            # Remove this block when /status endpoint is consistent with /list
+            if response['status_message'] != "":
+                response["key"] = didimo.rstrip()
+                response["status"] = "error"
+
+            didimos.append(response)
+            if silent:
+                if response["status"] == "error":
+                    click.echo("Error on \"%s\"" % response["key"], err=True)
+                    sys.exit(1)
+                if response["status"] in ["pending", "processing"]:
+                    sys.exit(2)
+    except DidimoNotFoundException:
+        click.secho('No didimo with the requested key was found on this account.', err=True, fg='red')
+        sys.exit(0)
 
     if silent:
         sys.exit(0)
 
-    if raw:
+    if output_display_type_json_flag:
         click.echo(json.dumps(didimos, indent=4))
     else:
         print_status_header()
@@ -1264,13 +1457,17 @@ def status(config, id, raw, silent):
             print_status_row(didimo)
 
 
+
 @cli.command(short_help='Get details of didimos')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True, nargs=-1)
-@click.option("-r", "--raw", required=False, is_flag=True, default=False,
-              help="Do not format output, print raw JSON response from API.")
+#@click.option("-r", "--raw", required=False, is_flag=True, default=False,
+#              help="Do not format output, print raw JSON response from API.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def inspect(config, id, raw):
+def inspect(config, id, output_display_type):
     """
     Get details of didimos
 
@@ -1281,29 +1478,33 @@ def inspect(config, id, raw):
     If <ID> is the character "-", read the IDs from STDIN.
 
     """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     didimos = []
 
-    ids = set(id)
+    ids = create_set(id)
 
     # read didimo ids if used with a pipe
     if "-" in ids:
         ids = sys.stdin.readlines()
 
-    for didimo in ids:
+    try:
+        for didimo in ids:
+            response = get_didimo_status(config, didimo.rstrip())               
 
-        response = get_didimo_status(config, didimo.rstrip())
+            # TODO
+            # Remove this block when /status endpoint is consistent with /list
+            if response['status_message'] != "":
+                response["key"] = didimo.rstrip()
+                response["status"] = "error"
 
+            didimos.append(response)
+    except DidimoNotFoundException:
+        click.secho('No didimo with the requested key was found on this account.', err=True, fg='red')
+        sys.exit(0)
 
-
-        # TODO
-        # Remove this block when /status endpoint is consistent with /list
-        if response['status_message'] != "":
-            response["key"] = didimo.rstrip()
-            response["status"] = "error"
-
-        didimos.append(response)
-
-    if raw:
+    if output_display_type_json_flag:
         click.echo(json.dumps(didimos, indent=4))
     else:
         for didimo in didimos:
@@ -1339,26 +1540,6 @@ def inspect(config, id, raw):
             click.secho("--------------------------------", fg="green", err=True)
 
 
-@cli.command(short_help="Get or set configuration")
-@click.help_option(*HELP_OPTION_NAMES)
-@click.argument("name", required=False)
-@pass_api
-def config(config, name):
-    """
-    Get or set configuration
-
-    With no arguments, list all available configurations.
-
-    If <NAME> is provided, set that as the default configuration.
-    """
-    if name == None:
-        config.list_configurations()
-    else:
-        click.echo("Setting default configuration to \"%s\"" % name, err=True)
-        config.save_configuration(name)
-        click.secho("Configuration file saved.", fg='blue', err=True)
-
-
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
@@ -1367,8 +1548,11 @@ def config(config, name):
 @click.option('--package-type', '-p',
               type=click.Choice(["fbx", "gltf"]),
               help="Specify output type for this didimo.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def download(config, id, output, package_type):
+def download(config, id, output, package_type, output_display_type):
     """
     Download a didimo
 
@@ -1377,6 +1561,8 @@ def download(config, id, output, package_type):
     When given the "-" character, read the didimo
     ID from STDIN.
     """
+
+    #output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
     if id == "-":
         id = sys.stdin.readlines()[0].rstrip()
@@ -1392,17 +1578,45 @@ def download(config, id, output, package_type):
             output = output + "/"
     download_didimo(config, id, package_type, output)
 
-
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
+@click.argument("id", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def version(config):
+def delete(config, id, output_display_type):
     """
-    Print CLI version and exit
-    """
-    print("CLI version: "+__version__)
-    sys.exit(0)
+    Delete a didimo
 
+    <id> is the didimo key
+
+    """
+    
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    api_path = "/v3/didimos/"
+    url = config.api_host + api_path + id
+
+    r = http_delete(url, auth=DidimoAuth(config, api_path))
+
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 204:
+            if r.status_code == 404:
+                click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
+        click.secho('Deleted!', err=False, fg='blue')
+
+
+#####################################
+#
+# Hair/Asset Deformation
+#
+######################################
 
 @cli.group()
 @click.help_option(*HELP_OPTION_NAMES)
@@ -1419,8 +1633,11 @@ def execute(config):
 @click.argument("input", type=click.Path(exists=True), required=True)
 @click.option("-t", "--timeout", required=False, is_flag=False, default=None,
               help="Set maximum time allowed for the function to complete.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def hairsdeform(config, input, timeout):
+def hairsdeform(config, input, timeout, output_display_type):
     """
     Produce high fidelity hairstyle deformation for a didimo, given a deformation file
 
@@ -1433,6 +1650,8 @@ def hairsdeform(config, input, timeout):
     If the input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
     api_path = "/v3/assets"
     url = config.api_host + api_path
@@ -1468,7 +1687,15 @@ def hairsdeform(config, input, timeout):
         filePath = input
 
     if filePath == "":
-        click.echo("Error with path to dmx file")        
+        error_msg = "Error with path to dmx file"
+        if output_display_type_json_flag:
+            cmd_response_json = {
+                                  "input_error": True,
+                                  "message": error_msg
+                                }
+            click.echo(str(cmd_response_json))
+        else:
+            click.echo(error_msg)        
         return
 
     files = [('template_deformation', (filePath, open(
@@ -1481,31 +1708,7 @@ def hairsdeform(config, input, timeout):
     r = requests.request("POST", url, headers=headers,
                          data=payload, files=files)
 
-    if r.status_code != 201:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo(r.text)
-        sys.exit(1)
-
-    response = r.json()
-
-    key = response['key']
-    url = ""
-    for package_itm in r.json()['transfer_formats']:
-        url = package_itm["__links"]["self"]
-        break
-
-    curr_dir = os.getcwd()
-    if not curr_dir.endswith('/'):
-        curr_dir = curr_dir + "/"
-
-    output = "%s.zip" % (curr_dir+ outputFilePrefix + key + outputFileSuffix)
-
-    click.echo("Creating package file.")
-    error_status = wait_for_dgp_completion(config, key, timeout)
-    if error_status:
-        click.echo("There was an error creating package file. Download aborted.")
-    else:
-        download_asset(config, url, api_path, output)
+    deformation_aux_shared_processing_and_download(config, timeout, r, api_path, outputFileSuffix, output_display_type_json_flag)
 
 
 @execute.command(short_help="Deform a model to match a didimo shape")
@@ -1514,8 +1717,11 @@ def hairsdeform(config, input, timeout):
 @click.argument("user_asset", required=True, type=click.Path(exists=True))
 @click.option("-t", "--timeout", required=False, is_flag=False, default=None,
               help="Set maximum time allowed for the function to complete.")
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def vertexdeform(config, vertex, user_asset, timeout):
+def vertexdeform(config, vertex, user_asset, timeout, output_display_type):
     """
     Deform an asset to match a didimo shape
 
@@ -1529,6 +1735,8 @@ def vertexdeform(config, vertex, user_asset, timeout):
     If the vertex input was a zip file from which we are able to decode a didimo key, the output will be named after the original didimo key.
 
     """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
     api_path = "/v3/assets"
     url = config.api_host + api_path
@@ -1561,7 +1769,15 @@ def vertexdeform(config, vertex, user_asset, timeout):
         filePath = vertex
 
     if filePath == "":
-        click.echo("Error with path to dmx file")        
+        error_msg = "Error with path to dmx file"
+        if output_display_type_json_flag:
+            cmd_response_json = {
+                                  "input_error": True,
+                                  "message": error_msg
+                                }
+            click.echo(str(cmd_response_json))
+        else:
+            click.echo(error_msg)        
         return
 
     files = [
@@ -1576,76 +1792,44 @@ def vertexdeform(config, vertex, user_asset, timeout):
 
     r = requests.request("POST", url, headers=headers,
                          data=payload, files=files)
+    
+    deformation_aux_shared_processing_and_download(config, timeout, r, api_path, outputFileSuffix, output_display_type_json_flag)
 
-    if r.status_code != 201:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo(r.text)
-        sys.exit(1)
 
-    response = r.json()
+#####################################
+#
+# Didimo Metadata
+#
+######################################
 
-    key = response['key']
-    url = ""
-    for package_itm in r.json()['transfer_formats']:
-        url = package_itm["__links"]["self"]
-        break
-
-    curr_dir = os.getcwd()
-    if not curr_dir.endswith('/'):
-        curr_dir = curr_dir + "/"
-
-    output = "%s.zip" % (curr_dir + key + outputFileSuffix)
-
-    click.echo("Creating package file.")
-    error_status = wait_for_dgp_completion(config, key, timeout)
-    if error_status:
-        click.echo("There was an error creating package file. Download aborted.")
-    else:
-        download_asset(config, url, api_path, output)
-
-@cli.command()
+@cli.group()
 @click.help_option(*HELP_OPTION_NAMES)
-@click.argument("id", required=True)
 @pass_api
-def delete(config, id):
+def metadata(config):
     """
-    Delete a didimo
-
-    <id> is the didimo key
-
+    Perform metadata operations on didimos
     """
-    #
+    pass
 
-    api_path = "/v3/didimos/"
-    url = config.api_host + api_path + id
-
-    r = http_delete(url, auth=DidimoAuth(config, api_path))
-
-    if r.status_code != 204:
-        if r.status_code == 404:
-            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
-        else:
-            click.secho('Error %d' % r.status_code, err=True, fg='red')
-        sys.exit(1)
-
-    click.secho('Deleted!', err=False, fg='blue')
-
-
-@cli.command()
+@metadata.command(short_help="Sets metadata on a didimo", name='set')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.argument("name", required=True)
 @click.argument("value", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def set_metadata(config, id, name, value):
+def set(config, id, name, value, output_display_type):
     """
     Sets metadata on a didimo
 
     <id> is the didimo key
     <name> is the metadata key
     <value> is the metadata value
-
     """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     api_path = "/v3/didimos/"+id+"/meta_data"
     url = config.api_host + api_path
 
@@ -1653,62 +1837,80 @@ def set_metadata(config, id, name, value):
     
     r = http_post_no_break(url, auth=DidimoAuth(config, api_path), json=payload) 
 
-    if r.status_code != 201:
-        if r.status_code == 404:
-            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
-        elif r.status_code == 400:
-            click.secho('Please correct your input.', err=True, fg='red')
-        else:
-            click.secho('Error %d' % r.status_code, err=True, fg='red')
-        sys.exit(1)
-    click.secho('Metadata - Name: '+name+' Value: '+str(value), err=False, fg='blue')
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 201:
+            if r.status_code == 404:
+                click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
+            elif r.status_code == 400:
+                click.secho('Please correct your input.', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
+        click.secho('Metadata - Name: '+name+' Value: '+str(value), err=False, fg='blue')
 
-@cli.command()
+@metadata.command(short_help="Gets metadata on a didimo", name='get')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.argument("name", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def get_metadata(config, id, name):
+def get(config, id, name, output_display_type):
     """
     Retrieves metadata on a didimo
 
     <id> is the didimo key
     <name> is the metadata key
-
     """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     api_path = "/v3/didimos/"+id+"/meta_data/"+name
     url = config.api_host + api_path
 
     
     r = http_get(url, auth=DidimoAuth(config, api_path)) 
 
-    if r.status_code != 200:
-        if r.status_code == 404:
-            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
-        elif r.status_code == 400:
-            click.secho('Please correct your input.', err=True, fg='red')
-        else:
-            click.secho('Error %d' % r.status_code, err=True, fg='red')
-        sys.exit(1)
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 200:
+            if r.status_code == 404:
+                res = r.json()
+                if res["code"] == 10008:
+                    click.secho('Metadata attribute not found for this didimo.', err=True, fg='red')
+                else:
+                    click.secho('No didimo with the requested key was found on this account.', err=True, fg='red')
+            elif r.status_code == 400:
+                click.secho('Please correct your input.', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
 
-    response = r.json()
-    click.secho('Metadata - Name: '+name+' Value: '+str(response['value']), err=False, fg='blue')
+        response = r.json()
+        click.secho('Metadata - Name: '+name+' Value: '+str(response['value']), err=False, fg='blue')
 
-@cli.command()
+@metadata.command(short_help="Updates metadata on a didimo", name='update')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.argument("name", required=True)
 @click.argument("value", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def update_metadata(config, id, name, value):
+def update(config, id, name, value, output_display_type):
     """
     Updates metadata on a didimo
 
     <id> is the didimo key
     <name> is the metadata key
     <value> is the new metadata value
-
     """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     api_path = "/v3/didimos/"+id+"/meta_data/"+name
     url = config.api_host + api_path
 
@@ -1716,50 +1918,697 @@ def update_metadata(config, id, name, value):
     
     r = http_put(url, auth=DidimoAuth(config, api_path), json=payload) 
 
-    if r.status_code != 200:
-        if r.status_code == 404:
-            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
-        elif r.status_code == 403:
-            click.secho('The didimo\'s metadata item cannot be updated because it is not user-defined.', err=True, fg='red')
-        elif r.status_code == 400:
-            click.secho('Please correct your input.', err=True, fg='red')
-        else:
-            click.secho('Error %d' % r.status_code, err=True, fg='red')
-        sys.exit(1)
-    click.secho('Updated!', err=False, fg='blue')
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 200:
+            if r.status_code == 404:
+                res = r.json()
+                if res["code"] == 10008:
+                    click.secho('Metadata attribute not found for this didimo.', err=True, fg='red')
+                else:
+                    click.secho('No didimo with the requested key was found on this account.', err=True, fg='red')
+            elif r.status_code == 403:
+                click.secho('The didimo\'s metadata item cannot be updated because it is not user-defined.', err=True, fg='red')
+            elif r.status_code == 400:
+                click.secho('Please correct your input.', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
+        click.secho('Updated!', err=False, fg='blue')
 
-@cli.command()
+
+@metadata.command(short_help="Deletes metadata on a didimo", name='delete')
 @click.help_option(*HELP_OPTION_NAMES)
 @click.argument("id", required=True)
 @click.argument("name", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def delete_metadata(config, id, name):
+def delete(config, id, name, output_display_type):
     """
     Deletes metadata on a didimo
 
     <id> is the didimo key
     <name> is the metadata key
-
     """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     api_path = "/v3/didimos/"+id+"/meta_data/"+name
     url = config.api_host + api_path
     
     r = http_delete(url, auth=DidimoAuth(config, api_path)) 
 
-    if r.status_code != 204:
-        if r.status_code == 404:
-            click.secho('No didimo with the requested key was found on this account', err=True, fg='red')
-        elif r.status_code == 403:
-            click.secho('The didimo\'s metadata item cannot be deleted because it is not user-defined.', err=True, fg='red')
-        elif r.status_code == 400:
-            click.secho('Please correct your input.', err=True, fg='red')
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 204:
+            if r.status_code == 404:
+                res = r.json()
+                if res["code"] == 10008:
+                    click.secho('Metadata attribute not found for this didimo.', err=True, fg='red')
+                else:
+                    click.secho('No didimo with the requested key was found on this account.', err=True, fg='red')
+            elif r.status_code == 403:
+                click.secho('The didimo\'s metadata item cannot be deleted because it is not user-defined.', err=True, fg='red')
+            elif r.status_code == 400:
+                click.secho('Please correct your input.', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
+        click.secho('Deleted!', err=False, fg='blue')
+
+#####################################
+#
+# Didimo Generation Templates
+#
+######################################
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def generation_template(config):
+    """
+    Perform didimo generation template management operations on general compatibility DGP version
+    """
+    pass
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def generation_template_2_5_7(config):
+    """
+    Perform didimo generation template management operations on DGP compatible version 2.5.7
+    """
+    pass
+
+@cli.group()
+@click.help_option(*HELP_OPTION_NAMES)
+@pass_api
+def generation_template_2_5_10(config):
+    """
+    Perform didimo generation template management operations on DGP compatible version 2.5.10
+    """
+    pass
+
+## LIST ##########
+
+@generation_template_2_5_7.command(short_help="Lists available didimo generation templates", name='list')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def list(config, output_display_type):
+    """
+    Lists available didimo generation templates
+    """
+    list_didimo_generation_templates_aux(config, output_display_type)
+
+@generation_template_2_5_10.command(short_help="Lists available didimo generation templates", name='list')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def list(config, output_display_type):
+    """
+    Lists available didimo generation templates
+    """
+    list_didimo_generation_templates_aux(config, output_display_type)
+
+
+def list_didimo_generation_templates_aux(config, output_display_type):
+    """
+    (Shared Implementation) Lists available didimo generation templates
+    """
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    api_path = "/v3/didimo_generation_templates"
+    url = config.api_host + api_path
+
+    
+    r = http_get(url, auth=DidimoAuth(config, api_path)) 
+
+    if output_display_type_json_flag:
+        click.echo(r.text)
+    else:
+        if r.status_code != 200:
+            if r.status_code == 404:
+                res = r.json()
+                click.secho('Not found.', err=True, fg='red')
+            elif r.status_code == 400:
+                click.secho('Please correct your input.', err=True, fg='red')
+            else:
+                click.secho('Error %d' % r.status_code, err=True, fg='red')
+            sys.exit(1)
+
+        while True:
+
+            json_response = r.json()
+            _DGTs = json_response['didimo_generation_templates']
+            next_page = json_response['__links']['next'] if '__links' in json_response and 'next' in json_response['__links'] else None
+
+            print_didimo_generation_template_header()
+            for _DGT in _DGTs:
+                print_didimo_generation_template_row(_DGT)
+
+            if next_page != None:
+                click.confirm('There are more results. Fetch next page?', abort=True)
+
+                api_path = next_page
+                url = api_path
+                r = http_get(url, auth=DidimoAuth(config, api_path))
+            else:
+                break
+
+## GET ##########
+
+@generation_template_2_5_7.command(short_help="Gets a didimo generation template", name='get')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def get(config, uuid, output_display_type):
+    """
+    Retrieves a didimo generation template
+
+    <uuid> is the didimo generation template UUID
+    """
+    get_didimo_generation_template_aux(config, uuid, output_display_type)
+
+@generation_template_2_5_10.command(short_help="Gets a didimo generation template", name='get')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def get(config, uuid, output_display_type):
+    """
+    Retrieves a didimo generation template
+
+    <uuid> is the didimo generation template UUID
+    """
+    get_didimo_generation_template_aux(config, uuid, output_display_type)
+
+## DELETE ##########
+
+@generation_template_2_5_7.command(short_help="Deletes a didimo generation template", name='delete')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def delete(config, uuid, output_display_type):
+    """
+    Deletes a didimo generation template
+
+    <id> is the didimo generation template UUID
+    """
+    delete_didimo_generation_template_aux(config, uuid, output_display_type)
+
+@generation_template_2_5_10.command(short_help="Deletes a didimo generation template", name='delete')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def delete(config, uuid, output_display_type):
+    """
+    Deletes a didimo generation template
+
+    <id> is the didimo generation template UUID
+    """
+    delete_didimo_generation_template_aux(config, uuid, output_display_type)
+
+
+## CREATE ##########
+
+@generation_template_2_5_7.command(short_help="Create a didimo generation template", name='create')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("template_name", required=True)
+@click.argument("description", required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture-dimension', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def create(config, template_name, description, input_type, feature, avatar_structure, garment, gender, max_texture_dimension, package_type, output_display_type):
+    """
+    Create a didimo generation template on DGP compatible version 2.5.7
+
+    TEMPLATE_NAME is the didimo generation template name.\n
+    DESCRIPTION is the didimo generation template description.\n
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+    \b
+    Examples:
+        Create a template named xpto that generates a didimo from a photo
+        $ didimo generation-template create xpto "simple template example based on photo input" photo
+    """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    settings = {}
+
+    if input_type != None:
+        settings["input_type"] = input_type
+
+    if avatar_structure != None:
+        settings["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        settings["garment"] = garment
+
+    if gender != None:
+        settings["gender"] = gender
+
+    if max_texture_dimension != None:
+        settings["max_texture_dimension"] = max_texture_dimension
+
+    if len(package_type) > 0:
+        settings["transfer_formats"] = package_type
+
+    for feature_item in feature:
+        settings[feature_item] = 'true'
+
+    payload = {
+        "template_name": template_name,
+        "description": description,
+        "settings": settings,
+        "scope": "user"
+    }
+    serialized_payload = str(payload)
+
+    api_path = "/v3/didimo_generation_templates"
+    url = config.api_host + api_path
+
+    r = http_request_json(url, "POST", config.access_key, serialized_payload, False)
+    generation_template_shared_response_processing(r, output_display_type_json_flag)
+
+
+@generation_template_2_5_10.command(short_help="Create a didimo generation template", name='create')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("template_name", required=True)
+@click.argument("description", required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty", "business"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "hair_001",  
+                  "hair_002", 
+                  "hair_003", 
+                  "hair_004", 
+                  "hair_005", 
+                  "hair_006", 
+                  "hair_007", 
+                  "hair_008", 
+                  "hair_009", 
+                  "hair_010", 
+                  "hair_011"]),
+              help="Create didimo with hair option.")
+@click.option('--body-pose', '-bp',
+              type=click.Choice(["A", "T"]),
+              help="Specify body pose for this didimo. This option is only available for full-body didimos.", show_default=False)
+@click.option('--profile', 
+              type=click.Choice(["standard", "optimized"]),
+              help="Specify a profile to drive this didimo generation.", show_default=False)
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def create(config, template_name, description, input_type, feature, avatar_structure, garment, gender, hair, body_pose, profile, package_type, output_display_type):
+    """
+    Create a didimo generation template on DGP compatible version 2.5.10
+
+    TEMPLATE_NAME is the didimo generation template name.\n
+    DESCRIPTION is the didimo generation template description.\n
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+
+    \b
+    Examples:
+        Create a template named xpto that generates a didimo from a photo
+        $ didimo generation-template create xpto "simple template example based on photo input" photo
+    """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    settings = {}
+
+    if input_type != None:
+        settings["input_type"] = input_type
+
+    if avatar_structure != None:
+        settings["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        settings["garment"] = garment
+
+    if gender != None:
+        settings["gender"] = gender
+
+    if hair != None:
+        settings["hair"] = hair
+
+    if body_pose != None:
+        if avatar_structure == "full-body":
+            settings["body_pose"] = body_pose
         else:
-            click.secho('Error %d' % r.status_code, err=True, fg='red')
-        sys.exit(1)
-    click.secho('Deleted!', err=False, fg='blue')
+            click.echo("The body pose feature is only available for full body didimos.", err=True)
+            exit(1);
+    
+    if profile != None:
+        settings["profile"] = profile
+
+    if len(package_type) > 0:
+        settings["transfer_formats"] = package_type
+
+    for feature_item in feature:
+        settings[feature_item] = 'true'
+
+    payload = {
+        "template_name": template_name,
+        "description": description,
+        "settings": settings,
+        "scope": "user"
+    }
+    serialized_payload = str(payload)
+
+    api_path = "/v3/didimo_generation_templates"
+
+    print(serialized_payload)
+    url = config.api_host + api_path
+
+    r = http_request_json(url, "POST", config.access_key, serialized_payload, False)
+    generation_template_shared_response_processing(r, output_display_type_json_flag)
 
 
-def get_api_version(config):
+## UPDATE ##########
+
+@generation_template_2_5_7.command(short_help="Updates a didimo generation template", name='update')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.argument("template_name", required=True)
+@click.argument("description", required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--max-texture-dimension', '-m', multiple=False,
+              type=click.Choice(
+                  ["512", "1024", "2048"]),
+              help="Create didimo with optional max texture dimension.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def update(config, uuid, template_name, description, input_type, feature, avatar_structure, garment, gender, max_texture_dimension, package_type, output_display_type):
+    """
+    Update a didimo generation template on DGP compatible version 2.5.7
+
+    UUID is the didimo generation template UUID.\n
+    TEMPLATE_NAME is the didimo generation template name.\n
+    DESCRIPTION is the didimo generation template description.\n
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+    \b
+    Examples:
+        Updates a template with UUID xyz, by renaming it to "simple photo template" and matching description with settings that generates a didimo from a photo
+        $ didimo generation-template update xyz "simple photo template" "simple template example based on photo input" photo /path/input.jpg
+    """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    settings = {}
+
+    if input_type != None:
+        settings["input_type"] = input_type
+
+    if avatar_structure != None:
+        settings["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        settings["garment"] = garment
+
+    if gender != None:
+        settings["gender"] = gender
+
+    if max_texture_dimension != None:
+        settings["max_texture_dimension"] = max_texture_dimension
+
+    if len(package_type) > 0:
+        settings["transfer_formats"] = package_type
+
+    for feature_item in feature:
+        settings[feature_item] = 'true'
+
+    payload = {
+        "template_name": template_name,
+        "description": description,
+        "settings": settings
+    }
+    serialized_payload = str(payload)
+
+    api_path = "/v3/didimo_generation_templates/"+uuid
+    url = config.api_host + api_path
+
+    r = http_request_json(url, "PUT", config.access_key, serialized_payload, False)
+    generation_template_shared_response_processing(r, output_display_type_json_flag)
+
+
+@generation_template_2_5_10.command(short_help="Updates a didimo", name='update')
+@click.help_option(*HELP_OPTION_NAMES)
+@click.argument("uuid", required=True)
+@click.argument("template_name", required=True)
+@click.argument("description", required=True)
+@click.argument("input_type", type=click.Choice(["photo", "rgbd"]), required=True, metavar="TYPE")
+@click.option('--feature', '-f', multiple=True,
+              type=click.Choice(
+                  ["oculus_lipsync", "simple_poses", "arkit", "aws_polly"]),
+              help="Create didimo with optional features. This flag can be used multiple times.")
+@click.option('--avatar-structure', multiple=False,
+              type=click.Choice(
+                  ["head-only", "full-body"]),
+              help="Create didimo with avatar structure option.")
+@click.option('--garment', multiple=False,
+              type=click.Choice(
+                  ["none","casual", "sporty", "business"]),
+              help="Create didimo with garment option. This option is only available for full-body didimos.")
+@click.option('--gender', multiple=False,
+              type=click.Choice(
+                  ["female", "male", "auto"]),
+              help="Create didimo with gender option. This option is only available for full-body didimos.")
+@click.option('--hair', multiple=False,
+              type=click.Choice(
+                  ["baseball_cap", 
+                  "hair_001",  
+                  "hair_002", 
+                  "hair_003", 
+                  "hair_004", 
+                  "hair_005", 
+                  "hair_006", 
+                  "hair_007", 
+                  "hair_008", 
+                  "hair_009", 
+                  "hair_010", 
+                  "hair_011"]),
+              help="Create didimo with hair option.")
+@click.option('--body-pose', '-bp',
+              type=click.Choice(["A", "T"]),
+              help="Specify body pose for this didimo. This option is only available for full-body didimos.", show_default=False)
+@click.option('--profile',
+              type=click.Choice(["standard", "optimized"]),
+              help="Specify a profile to drive this didimo generation.", show_default=False)
+@click.option('--package-type', '-p', multiple=True,
+              type=click.Choice(["fbx", "gltf"]),
+              help="Specify output types for this didimo. This flag can be used multiple times.", show_default=True)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def update(config, uuid, template_name, description, input_type, feature, avatar_structure, garment, gender, hair, body_pose, profile, package_type, output_display_type):
+    """
+    Update a didimo generation template on DGP compatible version 2.5.10
+
+    UUID is the didimo generation template UUID.\n
+    TEMPLATE_NAME is the didimo generation template name.\n
+    DESCRIPTION is the didimo generation template description.\n
+
+    TYPE is the type of input used to create the didimo. Accepted values are:
+
+    \b
+        - photo (input must be a .jpg/.jpeg/.png)
+        - rgbd (input must be a .jpg/.jpeg/.png; use -d to provide the depth file, which must be a .png)
+
+        For more information on the input types, visit
+        https://developer.didimo.co/docs/cli\b
+    \b
+    Examples:
+        Updates a template with UUID xyz, by renaming it to "simple photo template" and matching description with settings that generates a didimo from a photo
+        $ didimo generation-template update xyz "simple photo template" "simple template example based on photo input" photo
+    """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    settings = {}
+
+    if input_type != None:
+        settings["input_type"] = input_type
+
+    if avatar_structure != None:
+        settings["avatar_structure"] = avatar_structure
+    
+    if garment != None:
+        settings["garment"] = garment
+
+    if gender != None:
+        settings["gender"] = gender
+
+    if hair != None:
+        settings["hair"] = hair
+
+    if body_pose != None:
+        if avatar_structure == "full-body":
+            settings["body_pose"] = body_pose
+        else:
+            click.echo("The body pose feature is only available for full body didimos.", err=True)
+            exit(1);
+    
+    if profile != None:
+        settings["profile"] = profile
+
+    if len(package_type) > 0:
+        settings["transfer_formats"] = package_type
+
+    for feature_item in feature:
+        settings[feature_item] = 'true'
+
+    payload = {
+        "template_name": template_name,
+        "description": description,
+        "settings": settings
+    }
+    serialized_payload = str(payload)
+
+    api_path = "/v3/didimo_generation_templates/"+uuid
+    url = config.api_host + api_path
+
+    r = http_request_json(url, "PUT", config.access_key, serialized_payload, False)
+    generation_template_shared_response_processing(r, output_display_type_json_flag)
+
+
+#####################################
+#
+# Other useful commands and functions
+#
+######################################
+
+@cli.command()
+@click.help_option(*HELP_OPTION_NAMES)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
+@pass_api
+def version(config, output_display_type):
+    """
+    Print CLI version and exit
+    """
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    if output_display_type_json_flag:
+        click.echo({"cli_version":__version__})
+    else:
+        click.echo("CLI version: "+__version__)
+    sys.exit(0)
+
+
+def get_api_version(config, output_display_type = "ignore_display_rules"):
+
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
     # Get the current DGP version from the applications using the selected API Key
     api_path = "/v3/accounts/default/applications"
     url = config.api_host + api_path
@@ -1767,64 +2616,55 @@ def get_api_version(config):
     #r = http_get(url, auth=DidimoAuth(config, api_path))
     r = cache_this_call(url, config.access_key, auth=DidimoAuth(config, api_path)) 
 
-    if r.status_code != 200:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
+
+    if output_display_type_json_flag:
         click.echo(r.text)
-        sys.exit(1)
+    else:
+        if r.status_code != 200:
+            click.secho('Error %d' % r.status_code, err=True, fg='red')
+            click.echo(r.text)
+            sys.exit(1)
 
-    response = r.json()
+        response = r.json()
 
-    for app in response["applications"]:
-        if "api_keys" in app:
-            for app_key in app["api_keys"]:
-                if app_key["key"] == config.access_key:
-                    return app["dgp_version"]
+        for app in response["applications"]:
+            if "api_keys" in app:
+                for app_key in app["api_keys"]:
+                    if app_key["key"] == config.access_key:
+                        return app["dgp_version"]
 
-    return "api version not found"
-
-def get_cli_version_compatibility_rules(config):
-    #Get the current CLI version compatibility rules 
-
-    api_path = "/v3/platforms/cli"
-    url = config.api_host + api_path
-
-    #r = http_get(url, auth=DidimoAuth(config, api_path))
-    r = cache_this_call(url, config.access_key, auth=DidimoAuth(config, api_path)) 
-
-    if r.status_code != 200:
-        click.secho('Error %d' % r.status_code, err=True, fg='red')
-        click.echo(r.text)
-        sys.exit(1)
-
-    response = r.json()
-
-    for version in response["versions"]:
-        if version["code"] == __version__:
-            return version["dgp_compatibility_rules"]
-
-    return "CLI version not found"
-
-    return compatibility_json
+        return "api version not found"
 
 
 @cli.command()
 @click.help_option(*HELP_OPTION_NAMES)
+@click.option('--output-display-type', help="Console output type.", 
+                                       type=click.Choice(["human-readable", "json"]), 
+                                       show_default=False)
 @pass_api
-def version_api(config):
+def version_api(config, output_display_type):
     """
     Print API/DGP version and exit
     """
-    print("API version: "+get_api_version(config))
+    output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
+
+    if output_display_type_json_flag:
+        click.echo({"api_version":get_api_version(config, "ignore_display_rules")})
+    else:
+        print("API version: "+get_api_version(config, output_display_type))
     sys.exit(0)
 
-@cli.command()
-@click.help_option(*HELP_OPTION_NAMES)
-@pass_api
-def version_cli_compatibility_rules(config):
+#@cli.command()
+#@click.help_option(*HELP_OPTION_NAMES)
+#@click.option('--output-display-type', help="Console output type.", 
+#                                       type=click.Choice(["human-readable", "json"]), 
+#                                       show_default=False)
+#@pass_api
+def version_cli_compatibility_rules(config, output_display_type):
     """
     Print CLI/DGP version compatibility rules and exit
     """
-    print("CLI version - compatibility rules: "+str(get_cli_version_compatibility_rules(config)))
+    print("CLI version - compatibility rules: "+str(get_cli_version_compatibility_rules(config, output_display_type)))
     sys.exit(0)
 
 
