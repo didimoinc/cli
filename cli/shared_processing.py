@@ -153,7 +153,7 @@ def new_aux_shared_processing(config, didimo_id, output_display_type_json_flag):
                     elif status_msg != "":
                         no_error = False
                         click.secho(err=True)
-                        click.secho('Error generating didimo %s from %s: %s' % (didimo_id, str(input_file), response["status_message"]), err=True, fg='red')
+                        click.secho('Error generating didimo %s: %s' % (didimo_id, response["status_message"]), err=True, fg='red')
                         break   
                 time.sleep(2)
     else:
@@ -420,15 +420,15 @@ def deformation_aux_shared_processing_and_download(config, timeout, request, api
         click.echo(str(cmd_response_json))
 
 
-def get_didimo_generation_template_aux(config, uuid, output_display_type, return_object_flag = False):
+def get_didimo_generation_template_aux(config, codename, output_display_type, return_object_flag = False):
     """
     (Shared Implementation) Retrieves a didimo generation template
 
-    <uuid> is the didimo generation template UUID
+    <codename> is the didimo generation template codename
     """
     output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
-    api_path = "/v3/didimo_generation_templates/"+uuid
+    api_path = "/v3/didimo_generation_templates/codename/"+codename
     url = config.api_host + api_path
 
     r = http_get_no_error(url, auth=DidimoAuth(config, api_path)) 
@@ -441,7 +441,7 @@ def get_didimo_generation_template_aux(config, uuid, output_display_type, return
         if r.status_code != 200:
             if r.status_code == 404:
                 res = r.json()
-                click.secho('No didimo generation template with the requested uuid was found.', err=True, fg='red')
+                click.secho('No didimo generation template with the requested codename was found.', err=True, fg='red')
             elif r.status_code == 400:
                 click.secho('Please correct your input.', err=True, fg='red')
             else:
@@ -453,15 +453,15 @@ def get_didimo_generation_template_aux(config, uuid, output_display_type, return
         print_didimo_generation_template_header()
         print_didimo_generation_template_row(response)
 
-def delete_didimo_generation_template_aux(config, uuid, output_display_type):
+def delete_didimo_generation_template_aux(config, codename, output_display_type):
     """
     (Shared Implementation) Deletes a didimo generation template
 
-    <uuid> is the didimo generation template UUID
+    <codename> is the didimo generation template codename
     """
     output_display_type_json_flag = get_output_display_type_json_flag(config, output_display_type)
 
-    api_path = "/v3/didimo_generation_templates/"+uuid
+    api_path = "/v3/didimo_generation_templates/codename/"+codename
     url = config.api_host + api_path
     
     r = http_delete(url, auth=DidimoAuth(config, api_path)) 
@@ -472,7 +472,7 @@ def delete_didimo_generation_template_aux(config, uuid, output_display_type):
         if r.status_code != 204:
             if r.status_code == 404:
                 #res = r.json()
-                click.secho('No didimo generation template with the requested uuid was found.', err=True, fg='red')
+                click.secho('No didimo generation template with the requested codename was found.', err=True, fg='red')
             elif r.status_code == 403:
                 click.secho('Insufficient priviledges: the didimo generation template cannot be deleted because it is not user-defined.', err=True, fg='red')
             elif r.status_code == 400:

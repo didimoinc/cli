@@ -56,9 +56,9 @@ def create_set(ids):
 
 #Didimo Generation Templates
 def print_didimo_generation_template_header():
-    click.secho("{:<36} │ {:<10} │ {:<6} │ {:<25} │ {:<42} │ {:^7}  "
+    click.secho("{:<32} │ {:<10} │ {:<6} │ {:<25} │ {:<42} │ {:^7}  "
                 .format(
-                    'DGT UUID', 'Created At', 'Scope', 'Name', 'Description', 'Settings'),
+                    'DGT codename', 'Created At', 'Scope', 'Name', 'Description', 'Settings'),
                 bold=True, err=False)
     click.secho("─" * 232)
 
@@ -91,9 +91,9 @@ def print_didimo_generation_template_row(dgt):
 
     
 
-    click.secho("{:<36} │ {:<10} │ {:<6} │ {:<25} │ {:<43}│ {:^7}"
+    click.secho("{:<32} │ {:<10} │ {:<6} │ {:<25} │ {:<43}│ {:^7}"
                 .format(
-                    dgt['uuid'],
+                    dgt['codename'],
                     created_at,
                     scope,
                     truncated_name,

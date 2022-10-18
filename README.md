@@ -199,8 +199,8 @@ didimo generation-templates create -h
 ```
 
 You will be able to use these templates as parameter on the commands:
-  - "new" (to generate a new didimo): e.g. didimo new /path_to_batch_input_files --template templateUUID
-  - "bulk" (to generate didimos in bulk): e.g. didimo bulk new didimos /path_to_batch_input_files --template templateUUID
+  - "new" (to generate a new didimo): e.g. didimo new /path_to_batch_input_files --template templateCodename
+  - "bulk" (to generate didimos in bulk): e.g. didimo bulk new didimos /path_to_batch_input_files --template templateCodename
 
 You will still be able to override any template values if needed by providing the parameters as you normally would, and the remaining attributes will be fetched from the provided template.
 
